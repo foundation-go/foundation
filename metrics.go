@@ -10,6 +10,10 @@ import (
 )
 
 func StartMetricsServer() {
+	if !GetEnvOrBool("METRICS_ENABLED", false) {
+		return
+	}
+
 	metricsPort := GetEnvOrInt("METRICS_PORT", 51077)
 	log.Infof("Exposing Prometheus metrics on http://0.0.0.0:%d", metricsPort)
 

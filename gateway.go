@@ -33,7 +33,7 @@ func NewStartGatewayOptions() StartGatewayOptions {
 }
 
 // StartGateway starts the Foundation gateway.
-func (a Application) StartGateway(opts StartGatewayOptions) {
+func (app Application) StartGateway(opts StartGatewayOptions) {
 	logApplicationStartup("gateway")
 
 	mux, err := gateway.RegisterServices(
@@ -65,8 +65,10 @@ func (a Application) StartGateway(opts StartGatewayOptions) {
 		}
 	}()
 
-	// Metrics
-	go StartMetricsServer()
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")

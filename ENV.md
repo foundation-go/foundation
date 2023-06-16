@@ -21,3 +21,14 @@ The following environment variables are only applicable when using authenticatio
 The following environment variables are only applicable when running in `gateway` mode.
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service.
+
+
+## Metrics
+
+- `METRICS_ENABLED`: Whether to enable Prometheus metrics endpoint. Default: `false`.
+
+## PostgreSQL
+
+- `DATABASE_ENABLED`: Whether to enable the PostgreSQL database. Default: `false`.
+- `DATABASE_POOL`: The maximum number of open connections to the database. Default: `5`.
+- `DATABASE_URL`: The URL of the PostgreSQL database.

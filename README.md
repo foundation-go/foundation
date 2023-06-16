@@ -9,6 +9,7 @@ It leverages the following technologies:
 - **gRPC**: An open-source, high-performance RPC (Remote Procedure Call) framework.
 - **gRPC Gateway**: A gRPC to JSON reverse proxy.
 - **Kafka**: A distributed streaming platform.
+- **PostgreSQL**: A powerful, open-source relational database system.
 - **WebSockets**: A protocol enabling bi-directional, persistent communication channels over TCP connections.
 
 The primary objective of Foundation is to offer a simple and user-friendly set of tools for creating scalable, resilient, and highly available applications.
@@ -32,6 +33,7 @@ The primary objective of Foundation is to offer a simple and user-friendly set o
 - [x] **gRPC Gateway**: Integration for exposing gRPC services as JSON endpoints.
 - [x] **ORY Hydra**: Integration for authenticating users on a gateway with ORY Hydra.
 - [x] **ORY Kratos**: Integration for authenticating users on a gateway with ORY Kratos.
+- [x] **PostgreSQL**: Integration for connecting to a PostgreSQL database.
 
 ## Getting Started
 

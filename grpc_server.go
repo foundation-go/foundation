@@ -25,7 +25,7 @@ func NewStartGRPCServerOptions() StartGRPCServerOptions {
 }
 
 // StartGRPCServer starts a Foundation application in gRPC server mode.
-func (a Application) StartGRPCServer(opts StartGRPCServerOptions) {
+func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	logApplicationStartup("grpc")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -42,8 +42,10 @@ func (a Application) StartGRPCServer(opts StartGRPCServerOptions) {
 		}
 	}()
 
-	// Metrics
-	go StartMetricsServer()
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")

@@ -21,7 +21,7 @@ func NewStartHTTPServerOptions() StartHTTPServerOptions {
 }
 
 // StartHTTPServer starts a Foundation application in HTTP Server mode.
-func (a Application) StartHTTPServer(opts StartHTTPServerOptions) {
+func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
 	logApplicationStartup("http")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -45,8 +45,10 @@ func (a Application) StartHTTPServer(opts StartHTTPServerOptions) {
 		}
 	}()
 
-	// Metrics
-	go StartMetricsServer()
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")
