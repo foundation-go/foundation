@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	fg "github.com/ri-nat/foundation/grpc"
 	"github.com/ri-nat/foundation/internal/outboxrepo"
 	"google.golang.org/protobuf/proto"
 )
@@ -101,6 +102,37 @@ func (app Application) NewAndPublishEventTx(ctx context.Context, msg proto.Messa
 	}
 
 	return app.PublishEventTx(ctx, event)
+}
+
+// WithTransaction executes the given function in a transaction. If the function
+// returns an event, it will be published.
+func (app Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, error)) error {
+	// Start transaction
+	tx, err := app.PG.Begin()
+	if err != nil {
+		return fg.NewInternalError(err, "failed to begin transaction")
+	}
+	defer tx.Rollback() // nolint: errcheck
+
+	// Execute function
+	event, err := f(tx)
+	if err != nil {
+		return err
+	}
+
+	// Publish event (if any)
+	if event != nil {
+		if err = app.PublishEvent(ctx, tx, event); err != nil {
+			return fg.NewInternalError(err, "failed to publish event")
+		}
+	}
+
+	// Commit transaction
+	if err = tx.Commit(); err != nil {
+		return fg.NewInternalError(err, "failed to commit transaction")
+	}
+
+	return nil
 }
 
 func protoNameToTopic(protoName string) string {
