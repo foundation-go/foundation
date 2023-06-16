@@ -8,7 +8,7 @@ import (
 
 func IncomingHeaderMatcher(key string) (string, bool) {
 	switch key {
-	case fhttp.HeaderXRequestID, fhttp.HeaderXAuthenticated, fhttp.HeaderXUserID:
+	case fhttp.HeaderXCorrelationID, fhttp.HeaderXAuthenticated, fhttp.HeaderXUserID:
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)

@@ -19,8 +19,8 @@ const (
 const (
 	// HeaderXAuthenticated is the header that indicates if the request is authenticated
 	HeaderXAuthenticated = "X-Authenticated"
-	// HeaderXRequestID is the header that contains the request ID
-	HeaderXRequestID = "X-Request-Id"
+	// HeaderXCorrelationID is the header that contains the correlation ID
+	HeaderXCorrelationID = "X-Correlation-Id"
 	// HeaderXUserID is the header that contains the user ID
 	HeaderXUserID = "X-User-Id"
 )

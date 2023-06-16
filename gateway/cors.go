@@ -23,7 +23,7 @@ var (
 	}
 
 	corsExposedHeaders = []string{
-		fhttp.HeaderXRequestID,
+		fhttp.HeaderXCorrelationID,
 	}
 )
 

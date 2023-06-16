@@ -45,11 +45,11 @@ func WithRequestLogger(handler http.Handler) http.Handler {
 		// Generate the request ID
 		requestID := uuid.New().String()
 		// pass it down to app
-		request.Header.Set(fhttp.HeaderXRequestID, requestID)
+		request.Header.Set(fhttp.HeaderXCorrelationID, requestID)
 		// attach it to logger
 		l := log.WithField("request_id", requestID).WithField("path", request.URL.Path)
 		// and write it to HTTP response
-		writer.Header().Set(fhttp.HeaderXRequestID, requestID)
+		writer.Header().Set(fhttp.HeaderXCorrelationID, requestID)
 
 		l.Infoln("Request started")
 
