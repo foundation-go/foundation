@@ -36,6 +36,11 @@ func NewStartGatewayOptions() StartGatewayOptions {
 func (app Application) StartGateway(opts StartGatewayOptions) {
 	logApplicationStartup("gateway")
 
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
+
 	mux, err := gateway.RegisterServices(
 		opts.Services,
 		gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
@@ -64,11 +69,6 @@ func (app Application) StartGateway(opts StartGatewayOptions) {
 			}
 		}
 	}()
-
-	// Start common components
-	if err := app.startComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
-	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")

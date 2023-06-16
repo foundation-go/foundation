@@ -24,6 +24,11 @@ func NewStartHTTPServerOptions() StartHTTPServerOptions {
 func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
 	logApplicationStartup("http")
 
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -44,11 +49,6 @@ func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
 			}
 		}
 	}()
-
-	// Start common components
-	if err := app.startComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
-	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")

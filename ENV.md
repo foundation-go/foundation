@@ -22,7 +22,6 @@ The following environment variables are only applicable when running in `gateway
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service.
 
-
 ## Metrics
 
 - `METRICS_ENABLED`: Whether to enable Prometheus metrics endpoint. Default: `false`.

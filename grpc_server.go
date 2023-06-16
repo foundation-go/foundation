@@ -28,6 +28,11 @@ func NewStartGRPCServerOptions() StartGRPCServerOptions {
 func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	logApplicationStartup("grpc")
 
+	// Start common components
+	if err := app.startComponents(); err != nil {
+		log.Fatalf("Failed to start components: %v", err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -41,11 +46,6 @@ func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
-
-	// Start common components
-	if err := app.startComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
-	}
 
 	<-ctx.Done()
 	log.Println("Shutting down server...")
