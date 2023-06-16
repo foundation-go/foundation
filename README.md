@@ -18,10 +18,10 @@ The primary objective of Foundation is to offer a simple and user-friendly set o
 - [ ] **Health Checks**: An interface for exposing the application's health to Kubernetes.
 - [ ] **Multiple Running Modes**: Foundation supports various running modes to cater to different application requirements: `gateway`, `grpc`, `http`, `worker`, or `job`.
 - [ ] **Tracing**: Trace your requests and log them in a structured format using OpenTracing.
-- [ ] **Transactional Outbox**: An implementation of the transactional outbox pattern, facilitating transactional message publishing to Kafka.
 - [ ] Wide range of different helpers for common tasks.
 - [x] **Graceful Shutdown**: gracefully shutdown your application when receiving a `SIGTERM` signal.
 - [x] **Metrics**: A metrics interface for collecting application metrics and exposing them to Prometheus.
+- [x] **Transactional Outbox**: An implementation of the transactional outbox pattern, facilitating transactional message publishing to Kafka.
 - [x] **Unified Logging**: A unified logging interface (via `logrus`), enabling convenient colored logging during development and structured logging in production.
 
 ## Out of the Box Integrations
