@@ -12,7 +12,7 @@ import (
 type FoundationOutboxEvent struct {
 	ID        int64
 	Topic     string
-	Partition int32
+	Key       string
 	Payload   []byte
 	Headers   json.RawMessage
 	CreatedAt time.Time

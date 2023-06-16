@@ -1,6 +1,6 @@
 -- name: CreateOutboxEvent :exec
-INSERT INTO foundation_outbox_events (topic, partition, payload, headers, created_at)
-VALUES ($1, $2, $3, $4, $5);
+INSERT INTO foundation_outbox_events (topic, key, payload, headers, created_at)
+VALUES ($1, $2, $3, $4, NOW());
 
 -- name: SelectOutboxEvents :many
 SELECT * FROM foundation_outbox_events WHERE id > $1;

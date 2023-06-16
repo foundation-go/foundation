@@ -8,29 +8,26 @@ package outboxrepo
 import (
 	"context"
 	"encoding/json"
-	"time"
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :exec
-INSERT INTO foundation_outbox_events (topic, partition, payload, headers, created_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO foundation_outbox_events (topic, key, payload, headers, created_at)
+VALUES ($1, $2, $3, $4, NOW())
 `
 
 type CreateOutboxEventParams struct {
-	Topic     string
-	Partition int32
-	Payload   []byte
-	Headers   json.RawMessage
-	CreatedAt time.Time
+	Topic   string
+	Key     string
+	Payload []byte
+	Headers json.RawMessage
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error {
 	_, err := q.db.ExecContext(ctx, createOutboxEvent,
 		arg.Topic,
-		arg.Partition,
+		arg.Key,
 		arg.Payload,
 		arg.Headers,
-		arg.CreatedAt,
 	)
 	return err
 }
@@ -45,7 +42,7 @@ func (q *Queries) DeleteOutboxEvents(ctx context.Context, id int64) error {
 }
 
 const selectOutboxEvents = `-- name: SelectOutboxEvents :many
-SELECT id, topic, partition, payload, headers, created_at FROM foundation_outbox_events WHERE id > $1
+SELECT id, topic, key, payload, headers, created_at FROM foundation_outbox_events WHERE id > $1
 `
 
 func (q *Queries) SelectOutboxEvents(ctx context.Context, id int64) ([]FoundationOutboxEvent, error) {
@@ -60,7 +57,7 @@ func (q *Queries) SelectOutboxEvents(ctx context.Context, id int64) ([]Foundatio
 		if err := rows.Scan(
 			&i.ID,
 			&i.Topic,
-			&i.Partition,
+			&i.Key,
 			&i.Payload,
 			&i.Headers,
 			&i.CreatedAt,
