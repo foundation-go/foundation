@@ -37,7 +37,7 @@ func (app Application) StartGateway(opts StartGatewayOptions) {
 	logApplicationStartup("gateway")
 
 	// Start common components
-	if err := app.startComponents(); err != nil {
+	if err := app.StartComponents(); err != nil {
 		log.Fatalf("Failed to start components: %v", err)
 	}
 

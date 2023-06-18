@@ -25,11 +25,11 @@ func NewStartWorkerOptions() StartWorkerOptions {
 }
 
 // StartWorker starts a Foundation application in worker mode.
-func (app Application) StartWorker(opts StartWorkerOptions) {
+func (app *Application) StartWorker(opts StartWorkerOptions) {
 	logApplicationStartup("worker")
 
 	// Start common components
-	if err := app.startComponents(); err != nil {
+	if err := app.StartComponents(); err != nil {
 		log.Fatalf("Failed to start components: %v", err)
 	}
 
@@ -57,7 +57,7 @@ Loop:
 
 	log.Println("Shutting down worker...")
 
-	app.stopComponents()
+	app.StopComponents()
 
 	log.Println("Worker gracefully stopped")
 }

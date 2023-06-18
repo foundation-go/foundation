@@ -21,11 +21,11 @@ func NewStartHTTPServerOptions() StartHTTPServerOptions {
 }
 
 // StartHTTPServer starts a Foundation application in HTTP Server mode.
-func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
+func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 	logApplicationStartup("http")
 
 	// Start common components
-	if err := app.startComponents(); err != nil {
+	if err := app.StartComponents(); err != nil {
 		log.Fatalf("Failed to start components: %v", err)
 	}
 
@@ -58,7 +58,7 @@ func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
 		log.Fatalf("Failed to gracefully shutdown server: %v", err)
 	}
 
-	app.stopComponents()
+	app.StopComponents()
 
 	log.Println("Server gracefully stopped")
 }

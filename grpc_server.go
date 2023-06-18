@@ -25,11 +25,11 @@ func NewStartGRPCServerOptions() StartGRPCServerOptions {
 }
 
 // StartGRPCServer starts a Foundation application in gRPC server mode.
-func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
+func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	logApplicationStartup("grpc")
 
 	// Start common components
-	if err := app.startComponents(); err != nil {
+	if err := app.StartComponents(); err != nil {
 		log.Fatalf("Failed to start components: %v", err)
 	}
 
@@ -52,7 +52,7 @@ func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 
 	// Gracefully stop the server
 	server.GracefulStop()
-	app.stopComponents()
+	app.StopComponents()
 
 	log.Println("Server gracefully stopped")
 }

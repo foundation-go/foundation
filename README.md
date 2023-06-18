@@ -39,7 +39,7 @@ Foundation comes with built-in support for:
 - [x] **ORY Hydra**: Authenticate users on a gateway with ORY Hydra.
 - [x] **ORY Kratos**: Authenticate users on a gateway with ORY Kratos.
 - [x] **gRPC Gateway**: Expose gRPC services as JSON endpoints.
-- [ ] **Kafka**: Produce and consume messages with Kafka.
+- [x] **Kafka**: Produce and consume messages with Kafka (via `confluent-kafka-go`).
 - [ ] **Sentry**: Report errors to Sentry.
 
 ## Getting Started
