@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"errors"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -18,7 +19,10 @@ func NewInternalError(err error, msg string) error {
 }
 
 // NewInvalidArgumentError creates an invalid argument error with error details.
-func NewInvalidArgumentError(err error, msg string, violations map[string][]string) error {
+func NewInvalidArgumentError(kind string, id string, violations map[string][]string) error {
+	obj := fmt.Sprintf("%s/%s", kind, id)
+	msg := "validation error"
+	err := errors.New("validation error")
 	log.WithError(err).Debug(msg)
 
 	// Create status with error message
@@ -29,7 +33,7 @@ func NewInvalidArgumentError(err error, msg string, violations map[string][]stri
 	for field, description := range violations {
 		for _, d := range description {
 			badRequest.FieldViolations = append(badRequest.FieldViolations, &errdetails.BadRequest_FieldViolation{
-				Field:       field,
+				Field:       fmt.Sprintf("%s#%s", obj, field),
 				Description: d,
 			})
 		}
@@ -60,8 +64,8 @@ func NewPermissionDeniedError(err error, msg string) error {
 }
 
 // NewStaleObjectError creates a stale object error.
-func NewStaleObjectError(class string, id string, actualVersion, expectedVersion int32) error {
-	msg := fmt.Sprintf("stale object: %s/%s", class, id)
+func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion int32) error {
+	msg := fmt.Sprintf("stale object: %s/%s", kind, id)
 	err := fmt.Errorf("expected version: %d, actual version: %d", expectedVersion, actualVersion)
 	log.WithError(err).Debug(msg)
 
@@ -72,7 +76,7 @@ func NewStaleObjectError(class string, id string, actualVersion, expectedVersion
 	st, err = st.WithDetails(&errdetails.PreconditionFailure{
 		Violations: []*errdetails.PreconditionFailure_Violation{{
 			Type:        "stale_object",
-			Subject:     fmt.Sprintf("%s/%s", class, id),
+			Subject:     fmt.Sprintf("%s/%s", kind, id),
 			Description: fmt.Sprintf("actual version: %d, expected version: %d", actualVersion, expectedVersion),
 		}},
 	})

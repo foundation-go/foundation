@@ -57,4 +57,8 @@ func (app Application) StartHTTPServer(opts StartHTTPServerOptions) {
 	if err := server.Shutdown(context.Background()); err != nil {
 		log.Fatalf("Failed to gracefully shutdown server: %v", err)
 	}
+
+	app.stopComponents()
+
+	log.Println("Server gracefully stopped")
 }

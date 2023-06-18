@@ -13,8 +13,8 @@ import (
 
 // StartGRPCServerOptions are the options to start a Foundation application in gRPC Server mode.
 type StartGRPCServerOptions struct {
-	// Register is a function that registers the gRPC server implementation.
-	Register func(s *grpc.Server)
+	// RegisterFunc is a function that registers the gRPC server implementation.
+	RegisterFunc func(s *grpc.Server)
 
 	// GRPCServerOptions are the gRPC server options to use.
 	GRPCServerOptions []grpc.ServerOption
@@ -39,7 +39,7 @@ func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	listener := aquireListener()
 	server := grpc.NewServer(opts.GRPCServerOptions...)
 
-	opts.Register(server)
+	opts.RegisterFunc(server)
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
@@ -52,6 +52,8 @@ func (app Application) StartGRPCServer(opts StartGRPCServerOptions) {
 
 	// Gracefully stop the server
 	server.GracefulStop()
+	app.stopComponents()
+
 	log.Println("Server gracefully stopped")
 }
 

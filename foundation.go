@@ -37,3 +37,10 @@ func (app Application) startComponents() error {
 
 	return nil
 }
+
+func (app Application) stopComponents() {
+	// PostgreSQL
+	if app.PG != nil {
+		app.PG.Close()
+	}
+}
