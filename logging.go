@@ -6,13 +6,15 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func initLogging() {
+func initLogger(appName string) *log.Entry {
+	logger := log.New()
+
 	switch AppEnv() {
 	case EnvProduction:
-		log.SetReportCaller(true)
-		log.SetFormatter(&log.JSONFormatter{})
+		logger.SetReportCaller(true)
+		logger.SetFormatter(&log.JSONFormatter{})
 	default:
-		log.SetFormatter(&log.TextFormatter{
+		logger.SetFormatter(&log.TextFormatter{
 			FullTimestamp: true,
 		})
 	}
@@ -22,12 +24,14 @@ func initLogging() {
 		logLevel = log.InfoLevel
 	}
 
-	log.SetLevel(logLevel)
+	logger.SetLevel(logLevel)
+
+	return logger.WithField("app", appName)
 }
 
-func logApplicationStartup(mode string) {
-	log.Infof("Starting application")
-	log.Infof("- Mode:        %s", mode)
-	log.Infof("- Environment: %s", AppEnv())
-	log.Infof("- Foundation:  v%s", Version)
+func (app *Application) logStartup(mode string) {
+	app.Logger.Infof("Starting application")
+	app.Logger.Infof("- Mode:        %s", mode)
+	app.Logger.Infof("- Environment: %s", AppEnv())
+	app.Logger.Infof("- Foundation:  v%s", Version)
 }

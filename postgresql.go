@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (app *Application) connectToPostgreSQL() error {
-	log.Info("Connecting to PostgreSQL...")
+	app.Logger.Info("Connecting to PostgreSQL...")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	connConfig, err := pgx.ParseConfig(dbURL)

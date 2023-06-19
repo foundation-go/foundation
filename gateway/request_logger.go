@@ -6,6 +6,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	fctx "github.com/ri-nat/foundation/context"
 	fhttp "github.com/ri-nat/foundation/http"
 
 	"github.com/google/uuid"
@@ -53,8 +54,13 @@ func WithRequestLogger(handler http.Handler) http.Handler {
 
 		l.Infoln("Request started")
 
+		// Add the logger to the request context
+		ctx := fctx.SetCtxLogger(request.Context(), l)
+		request = request.WithContext(ctx)
+
 		// Wrap the response writer with our logging response writer
 		lrw := NewLoggingResponseWriter(writer)
+
 		// Serve the request with the wrapped response writer
 		handler.ServeHTTP(lrw, request)
 

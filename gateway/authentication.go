@@ -8,7 +8,6 @@ import (
 
 	hydra "github.com/ory/hydra-client-go"
 	kratos "github.com/ory/kratos-client-go"
-	log "github.com/sirupsen/logrus"
 
 	fhttp "github.com/ri-nat/foundation/http"
 )
@@ -107,7 +106,6 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 		// Authenticate the token
 		result, err := authenticate(token)
 		if err != nil {
-			log.Errorf("WithAuthenticationDetails failed to authenticate token: %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
 			return
 		}

@@ -5,8 +5,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // StartWorkerOptions are the options to start a Foundation application in worker mode.
@@ -26,11 +24,11 @@ func NewStartWorkerOptions() StartWorkerOptions {
 
 // StartWorker starts a Foundation application in worker mode.
 func (app *Application) StartWorker(opts StartWorkerOptions) {
-	logApplicationStartup("worker")
+	app.logStartup("worker")
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
+		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -46,7 +44,7 @@ Loop:
 			started := time.Now()
 
 			if err := opts.ProcessFunc(ctx); err != nil {
-				log.Errorf("Failed to run iteration: %v", err)
+				app.Logger.Errorf("Failed to run iteration: %v", err)
 			}
 
 			// Sleep for the remaining time of the interval
@@ -54,9 +52,9 @@ Loop:
 		}
 	}
 
-	log.Println("Shutting down worker...")
+	app.Logger.Println("Shutting down worker...")
 
 	app.StopComponents()
 
-	log.Println("Worker gracefully stopped")
+	app.Logger.Println("Worker gracefully stopped")
 }

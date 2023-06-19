@@ -10,7 +10,6 @@ import (
 	"syscall"
 
 	gw_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/ri-nat/foundation/gateway"
 )
@@ -25,7 +24,7 @@ type StartGatewayOptions struct {
 	WithAuthentication   bool
 	AuthenticationExcept []string
 
-	Middlewares []func(http.Handler) http.Handler
+	Middleware []func(http.Handler) http.Handler
 }
 
 func NewStartGatewayOptions() StartGatewayOptions {
@@ -33,12 +32,12 @@ func NewStartGatewayOptions() StartGatewayOptions {
 }
 
 // StartGateway starts the Foundation gateway.
-func (app Application) StartGateway(opts StartGatewayOptions) {
-	logApplicationStartup("gateway")
+func (app *Application) StartGateway(opts StartGatewayOptions) {
+	app.logStartup("gateway")
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
+		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 
 	mux, err := gateway.RegisterServices(
@@ -46,7 +45,7 @@ func (app Application) StartGateway(opts StartGatewayOptions) {
 		gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
 	)
 	if err != nil {
-		log.Fatal(err)
+		app.Logger.Fatal(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -55,67 +54,71 @@ func (app Application) StartGateway(opts StartGatewayOptions) {
 	port := GetEnvOrInt("PORT", 51051)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: applyMiddlewares(mux, opts),
+		Handler: app.applyMiddleware(mux, opts),
 	}
 
-	log.Infof("Listening on http://0.0.0.0:%d", port)
+	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			if err == http.ErrServerClosed {
-				log.Println("Server stopped")
+				app.Logger.Println("Server stopped")
 			} else {
-				log.Fatalf("Failed to start server: %v", err)
+				app.Logger.Fatalf("Failed to start server: %v", err)
 			}
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("Shutting down server...")
+	app.Logger.Println("Shutting down server...")
 
 	// Gracefully stop the server
 	if err := server.Shutdown(context.Background()); err != nil {
-		log.Fatalf("Failed to gracefully shutdown server: %v", err)
+		app.Logger.Fatalf("Failed to gracefully shutdown server: %v", err)
 	}
+
+	app.StopComponents()
+
+	app.Logger.Println("Server gracefully stopped")
 }
 
-func applyMiddlewares(mux http.Handler, opts StartGatewayOptions) http.Handler {
-	log.Info("Using middlewares:")
+func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
+	app.Logger.Info("Using middleware:")
 
-	// General middlewares
-	middlewares := []func(http.Handler) http.Handler{
+	// General middleware
+	middleware := []func(http.Handler) http.Handler{
 		gateway.WithRequestLogger,
 		gateway.WithCORSEnabled,
 	}
-	for _, middleware := range middlewares {
-		printMiddlewareName(middleware)
-		mux = middleware(mux)
+	for _, m := range middleware {
+		app.printMiddlewareName(m)
+		mux = m(mux)
 	}
 
 	// Authentication details middleware
 	if opts.AuthenticationDetailsMiddleware != nil {
-		printMiddlewareName(opts.AuthenticationDetailsMiddleware)
+		app.printMiddlewareName(opts.AuthenticationDetailsMiddleware)
 		mux = opts.AuthenticationDetailsMiddleware(mux)
 	}
 
 	// Authentication middleware
 	if opts.WithAuthentication {
-		printMiddlewareName(gateway.WithAuthentication)
+		app.printMiddlewareName(gateway.WithAuthentication)
 		mux = gateway.WithAuthentication(mux, opts.AuthenticationExcept)
 	}
 
-	// Custom middlewares
-	for _, middleware := range opts.Middlewares {
-		printMiddlewareName(middleware)
-		mux = middleware(mux)
+	// Custom middleware
+	for _, m := range opts.Middleware {
+		app.printMiddlewareName(m)
+		mux = m(mux)
 	}
 
 	return mux
 }
 
-func printMiddlewareName(middleware interface{}) {
+func (app *Application) printMiddlewareName(middleware interface{}) {
 	funcValue := reflect.ValueOf(middleware)
 	funcName := runtime.FuncForPC(funcValue.Pointer()).Name()
 
-	log.Infof(" - %s", funcName)
+	app.Logger.Infof(" - %s", funcName)
 }

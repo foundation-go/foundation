@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/sirupsen/logrus"
 )
 
 const Version = "0.0.1"
@@ -21,15 +22,16 @@ type Application struct {
 	kafkaConsumerTopics []string
 	// KafkaProducer is a Kafka producer.
 	KafkaProducer *kafka.Producer
+
+	Logger *logrus.Entry
 }
 
 // Init initializes the Foundation application.
 func Init(name string) *Application {
-	initLogging()
-
 	return &Application{
 		Name:                name,
 		kafkaConsumerTopics: []string{},
+		Logger:              initLogger(name),
 	}
 }
 
@@ -65,7 +67,7 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 	}
 
 	// Metrics
-	go StartMetricsServer()
+	go app.StartMetricsServer()
 
 	return nil
 }

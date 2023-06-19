@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
@@ -26,45 +25,45 @@ func NewStartGRPCServerOptions() StartGRPCServerOptions {
 
 // StartGRPCServer starts a Foundation application in gRPC server mode.
 func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
-	logApplicationStartup("grpc")
+	app.logStartup("grpc")
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
+		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	listener := aquireListener()
+	listener := app.aquireListener()
 	server := grpc.NewServer(opts.GRPCServerOptions...)
 
 	opts.RegisterFunc(server)
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
+			app.Logger.Fatalf("Failed to start server: %v", err)
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("Shutting down server...")
+	app.Logger.Println("Shutting down server...")
 
 	// Gracefully stop the server
 	server.GracefulStop()
 	app.StopComponents()
 
-	log.Println("Server gracefully stopped")
+	app.Logger.Println("Server gracefully stopped")
 }
 
-func aquireListener() net.Listener {
+func (app *Application) aquireListener() net.Listener {
 	port := GetEnvOrInt("PORT", 51051)
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
-		log.Fatalf("Failed to listen port %d: %v", port, err)
+		app.Logger.Fatalf("Failed to listen port %d: %v", port, err)
 	}
 
-	log.Infof("Listening on http://0.0.0.0:%d", port)
+	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	return listener
 }

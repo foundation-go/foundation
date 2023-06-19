@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // StartHTTPServerOptions are the options to start a Foundation application in server mode.
@@ -22,11 +20,11 @@ func NewStartHTTPServerOptions() StartHTTPServerOptions {
 
 // StartHTTPServer starts a Foundation application in HTTP Server mode.
 func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
-	logApplicationStartup("http")
+	app.logStartup("http")
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		log.Fatalf("Failed to start components: %v", err)
+		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -38,27 +36,27 @@ func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 		Handler: opts.Handler,
 	}
 
-	log.Infof("Listening on http://0.0.0.0:%d", port)
+	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
 			if err == http.ErrServerClosed {
-				log.Println("Server stopped")
+				app.Logger.Println("Server stopped")
 			} else {
-				log.Fatalf("Failed to start server: %v", err)
+				app.Logger.Fatalf("Failed to start server: %v", err)
 			}
 		}
 	}()
 
 	<-ctx.Done()
-	log.Println("Shutting down server...")
+	app.Logger.Println("Shutting down server...")
 
 	// Gracefully stop the server
 	if err := server.Shutdown(context.Background()); err != nil {
-		log.Fatalf("Failed to gracefully shutdown server: %v", err)
+		app.Logger.Fatalf("Failed to gracefully shutdown server: %v", err)
 	}
 
 	app.StopComponents()
 
-	log.Println("Server gracefully stopped")
+	app.Logger.Println("Server gracefully stopped")
 }

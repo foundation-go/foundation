@@ -1,10 +1,7 @@
 package grpc
 
 import (
-	"errors"
 	"fmt"
-
-	log "github.com/sirupsen/logrus"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -13,8 +10,6 @@ import (
 
 // NewInternalError creates a generic internal error.
 func NewInternalError(err error, msg string) error {
-	log.WithError(err).Error(msg)
-
 	return status.Errorf(codes.Internal, "internal error")
 }
 
@@ -22,8 +17,6 @@ func NewInternalError(err error, msg string) error {
 func NewInvalidArgumentError(kind string, id string, violations map[string][]string) error {
 	obj := fmt.Sprintf("%s/%s", kind, id)
 	msg := "validation error"
-	err := errors.New("validation error")
-	log.WithError(err).Debug(msg)
 
 	// Create status with error message
 	st := status.New(codes.InvalidArgument, msg)
@@ -39,10 +32,8 @@ func NewInvalidArgumentError(kind string, id string, violations map[string][]str
 		}
 	}
 
-	st, err = st.WithDetails(badRequest)
+	st, err := st.WithDetails(badRequest)
 	if err != nil {
-		log.WithError(err).Error("failed to attach details to error")
-
 		return status.Error(codes.Internal, "internal error")
 	}
 
@@ -51,29 +42,23 @@ func NewInvalidArgumentError(kind string, id string, violations map[string][]str
 
 // NewNotFoundError creates a not found error.
 func NewNotFoundError(err error, msg string) error {
-	log.WithError(err).Debug(msg)
-
 	return status.Errorf(codes.NotFound, msg)
 }
 
 // NewPermissionDeniedError creates a permission denied error.
 func NewPermissionDeniedError(err error, msg string) error {
-	log.WithError(err).Debug(msg)
-
 	return status.Errorf(codes.PermissionDenied, msg)
 }
 
 // NewStaleObjectError creates a stale object error.
 func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion int32) error {
 	msg := fmt.Sprintf("stale object: %s/%s", kind, id)
-	err := fmt.Errorf("expected version: %d, actual version: %d", expectedVersion, actualVersion)
-	log.WithError(err).Debug(msg)
 
 	// Create status with error message
 	st := status.New(codes.FailedPrecondition, msg)
 
 	// Attach error details
-	st, err = st.WithDetails(&errdetails.PreconditionFailure{
+	st, err := st.WithDetails(&errdetails.PreconditionFailure{
 		Violations: []*errdetails.PreconditionFailure_Violation{{
 			Type:        "stale_object",
 			Subject:     fmt.Sprintf("%s/%s", kind, id),
@@ -81,8 +66,6 @@ func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion 
 		}},
 	})
 	if err != nil {
-		log.WithError(err).Error("failed to attach details to error")
-
 		return status.Error(codes.Internal, "internal error")
 	}
 
@@ -91,7 +74,5 @@ func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion 
 
 // NewUnauthenticatedError creates an unauthenticated error.
 func NewUnauthenticatedError(err error, msg string) error {
-	log.WithError(err).Debug(msg)
-
 	return status.Errorf(codes.Unauthenticated, msg)
 }

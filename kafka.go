@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	log "github.com/sirupsen/logrus"
 )
 
 // WithKafkaConsumerTopics sets the Kafka consumer topics.
@@ -18,7 +17,7 @@ func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
 }
 
 func (app *Application) connectKafkaConsumer() error {
-	log.Info("Connecting to Kafka as a consumer...")
+	app.Logger.Info("Connecting to Kafka as a consumer...")
 
 	brokers, err := getBrokers()
 	if err != nil {
@@ -50,7 +49,7 @@ func (app *Application) connectKafkaConsumer() error {
 }
 
 func (app *Application) connectKafkaProducer() error {
-	log.Info("Connecting to Kafka as a producer...")
+	app.Logger.Info("Connecting to Kafka as a producer...")
 
 	brokers, err := getBrokers()
 	if err != nil {
