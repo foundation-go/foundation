@@ -47,7 +47,6 @@ Loop:
 
 			if err := opts.ProcessFunc(ctx); err != nil {
 				log.Errorf("Failed to run iteration: %v", err)
-				continue
 			}
 
 			// Sleep for the remaining time of the interval

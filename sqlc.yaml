@@ -1,9 +1,9 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    queries: "internal/outboxrepo/queries.sql"
-    schema: "internal/outboxrepo/migrations"
+    queries: "outboxrepo/queries.sql"
+    schema: "outboxrepo/migrations"
     gen:
       go:
         package: "outboxrepo"
-        out: "internal/outboxrepo"
+        out: "outboxrepo"

@@ -33,7 +33,7 @@ func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventPa
 }
 
 const deleteOutboxEvents = `-- name: DeleteOutboxEvents :exec
-DELETE FROM foundation_outbox_events WHERE id = ANY($1)
+DELETE FROM foundation_outbox_events WHERE id <= $1
 `
 
 func (q *Queries) DeleteOutboxEvents(ctx context.Context, id int64) error {
@@ -41,12 +41,12 @@ func (q *Queries) DeleteOutboxEvents(ctx context.Context, id int64) error {
 	return err
 }
 
-const selectOutboxEvents = `-- name: SelectOutboxEvents :many
-SELECT id, topic, key, payload, headers, created_at FROM foundation_outbox_events WHERE id > $1
+const listOutboxEvents = `-- name: ListOutboxEvents :many
+SELECT id, topic, key, payload, headers, created_at FROM foundation_outbox_events ORDER BY id ASC LIMIT $1
 `
 
-func (q *Queries) SelectOutboxEvents(ctx context.Context, id int64) ([]FoundationOutboxEvent, error) {
-	rows, err := q.db.QueryContext(ctx, selectOutboxEvents, id)
+func (q *Queries) ListOutboxEvents(ctx context.Context, limit int32) ([]FoundationOutboxEvent, error) {
+	rows, err := q.db.QueryContext(ctx, listOutboxEvents, limit)
 	if err != nil {
 		return nil, err
 	}

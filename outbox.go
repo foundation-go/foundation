@@ -9,7 +9,7 @@ import (
 	"time"
 
 	fg "github.com/ri-nat/foundation/grpc"
-	"github.com/ri-nat/foundation/internal/outboxrepo"
+	"github.com/ri-nat/foundation/outboxrepo"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -44,7 +44,7 @@ func NewEvent(msg proto.Message, key string, headers map[string]string) (*Event,
 }
 
 // PublishEvent publishes an event to the outbox within a provided transaction
-func (app Application) PublishEvent(ctx context.Context, tx *sql.Tx, event *Event) error {
+func (app *Application) PublishEvent(ctx context.Context, tx *sql.Tx, event *Event) error {
 	// Marshal headers to JSON
 	headers, err := json.Marshal(event.Headers)
 	if err != nil {
@@ -68,7 +68,7 @@ func (app Application) PublishEvent(ctx context.Context, tx *sql.Tx, event *Even
 }
 
 // PublishEventTx publishes an event to the outbox, starting a new transaction
-func (app Application) PublishEventTx(ctx context.Context, event *Event) error {
+func (app *Application) PublishEventTx(ctx context.Context, event *Event) error {
 	// Start transaction
 	tx, err := app.PG.Begin()
 	if err != nil {
@@ -85,7 +85,7 @@ func (app Application) PublishEventTx(ctx context.Context, event *Event) error {
 }
 
 // NewAndPublishEvent creates a new event and publishes it to the outbox
-func (app Application) NewAndPublishEvent(ctx context.Context, tx *sql.Tx, msg proto.Message, key string, headers map[string]string) error {
+func (app *Application) NewAndPublishEvent(ctx context.Context, tx *sql.Tx, msg proto.Message, key string, headers map[string]string) error {
 	event, err := NewEvent(msg, key, headers)
 	if err != nil {
 		return err
@@ -95,7 +95,7 @@ func (app Application) NewAndPublishEvent(ctx context.Context, tx *sql.Tx, msg p
 }
 
 // NewAndPublishEventTx creates a new event and publishes it to the outbox within a transaction
-func (app Application) NewAndPublishEventTx(ctx context.Context, msg proto.Message, key string, headers map[string]string) error {
+func (app *Application) NewAndPublishEventTx(ctx context.Context, msg proto.Message, key string, headers map[string]string) error {
 	event, err := NewEvent(msg, key, headers)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (app Application) NewAndPublishEventTx(ctx context.Context, msg proto.Messa
 
 // WithTransaction executes the given function in a transaction. If the function
 // returns an event, it will be published.
-func (app Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, error)) error {
+func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, error)) error {
 	// Start transaction
 	tx, err := app.PG.Begin()
 	if err != nil {
@@ -130,6 +130,29 @@ func (app Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
 		return fg.NewInternalError(err, "failed to commit transaction")
+	}
+
+	return nil
+}
+
+// ListOutboxEvents returns a list of outbox events in the order they were created.
+func (app *Application) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, error) {
+	queries := outboxrepo.New(app.PG)
+
+	events, err := queries.ListOutboxEvents(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to `ListOutboxEvents`: %w", err)
+	}
+
+	return events, nil
+}
+
+// DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
+func (app *Application) DeleteOutboxEvents(ctx context.Context, maxID int64) error {
+	queries := outboxrepo.New(app.PG)
+
+	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {
+		return fmt.Errorf("failed to `DeleteOutboxEvents`: %w", err)
 	}
 
 	return nil

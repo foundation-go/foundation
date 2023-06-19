@@ -1,5 +1,5 @@
 CREATE TABLE foundation_outbox_events (
-    id BIGSERIAL PRIMARY KEY,
+    id BIGINT PRIMARY KEY,
     topic TEXT NOT NULL,
     key TEXT NOT NULL,
     payload BYTEA NOT NULL,

@@ -2,8 +2,8 @@
 INSERT INTO foundation_outbox_events (topic, key, payload, headers, created_at)
 VALUES ($1, $2, $3, $4, NOW());
 
--- name: SelectOutboxEvents :many
-SELECT * FROM foundation_outbox_events WHERE id > $1;
+-- name: ListOutboxEvents :many
+SELECT * FROM foundation_outbox_events ORDER BY id ASC LIMIT $1;
 
 -- name: DeleteOutboxEvents :exec
-DELETE FROM foundation_outbox_events WHERE id = ANY($1);
+DELETE FROM foundation_outbox_events WHERE id <= $1;
