@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 )
 
@@ -35,6 +36,16 @@ func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Default interceptors
+	//
+	// TODO: Work correctly with interceptors from options
+	interceptors := []grpc.UnaryServerInterceptor{
+		app.foundationErrorToStatusInterceptor,
+	}
+	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
+	opts.GRPCServerOptions = append(opts.GRPCServerOptions, chainedInterceptor)
+
+	// Start the server
 	listener := app.aquireListener()
 	server := grpc.NewServer(opts.GRPCServerOptions...)
 

@@ -5,6 +5,7 @@ go 1.20
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.1.1
 	github.com/google/uuid v1.3.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0
 	github.com/jackc/pgx/v5 v5.4.0
 	github.com/joho/godotenv v1.5.1

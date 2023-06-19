@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	fg "github.com/ri-nat/foundation/grpc"
 	"github.com/ri-nat/foundation/outboxrepo"
 	"google.golang.org/protobuf/proto"
 )
@@ -110,7 +109,7 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 	// Start transaction
 	tx, err := app.PG.Begin()
 	if err != nil {
-		return fg.NewInternalError(err, "failed to begin transaction")
+		return NewInternalError(err, "failed to begin transaction")
 	}
 	defer tx.Rollback() // nolint: errcheck
 
@@ -123,13 +122,13 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 	// Publish event (if any)
 	if event != nil {
 		if err = app.PublishEvent(ctx, tx, event); err != nil {
-			return fg.NewInternalError(err, "failed to publish event")
+			return NewInternalError(err, "failed to publish event")
 		}
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return fg.NewInternalError(err, "failed to commit transaction")
+		return NewInternalError(err, "failed to commit transaction")
 	}
 
 	return nil
