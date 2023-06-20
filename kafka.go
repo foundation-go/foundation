@@ -9,6 +9,12 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
+const (
+	KafkaHeaderCorrelationID = "correlation-id"
+	KafkaHeaderOriginatorID  = "originator-id"
+	KafkaHeaderProtoName     = "proto-name"
+)
+
 // WithKafkaConsumerTopics sets the Kafka consumer topics.
 func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
 	return func(app *Application) {

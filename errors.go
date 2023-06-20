@@ -3,8 +3,8 @@ package foundation
 import (
 	"context"
 	"fmt"
-	"runtime"
 
+	"github.com/pkg/errors"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -13,13 +13,11 @@ import (
 
 // BaseError is the base error type for all errors in the Foundation framework.
 type BaseError struct {
-	Err  error
-	File string
-	Line int
+	Err error
 }
 
 func (e *BaseError) Error() string {
-	return fmt.Sprintf("%s:%d: %v", e.File, e.Line, e.Err)
+	return e.Err.Error()
 }
 
 // FoundationError describes an interface for all errors in the Foundation framework.
@@ -28,6 +26,7 @@ type FoundationError interface {
 	GRPCStatus() *status.Status
 }
 
+// GRPCStatus returns a gRPC status error for the Foundation error.
 func (e *BaseError) GRPCStatus() *status.Status {
 	return status.New(codes.Internal, e.Err.Error())
 }
@@ -43,13 +42,9 @@ func (e *InternalError) GRPCStatus() *status.Status {
 
 // NewInternalError creates a generic internal error.
 func NewInternalError(err error, msg string) *InternalError {
-	_, file, line, _ := runtime.Caller(1)
-
 	return &InternalError{
 		BaseError: &BaseError{
-			Err:  fmt.Errorf("%s: %w", msg, err),
-			File: file,
-			Line: line,
+			Err: errors.Wrap(err, msg),
 		},
 	}
 }
@@ -92,13 +87,9 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 
 // NewInvalidArgumentError creates an invalid argument error with error details.
 func NewInvalidArgumentError(kind string, id string, violations map[string][]string) *InvalidArgumentError {
-	_, file, line, _ := runtime.Caller(1)
-
 	return &InvalidArgumentError{
 		BaseError: &BaseError{
-			Err:  fmt.Errorf("invalid argument: %s/%s", kind, id),
-			File: file,
-			Line: line,
+			Err: fmt.Errorf("invalid argument: %s/%s", kind, id),
 		},
 		Kind:       kind,
 		ID:         id,
@@ -122,13 +113,9 @@ func (e *NotFoundError) GRPCStatus() *status.Status {
 
 // NewNotFoundError creates a not found error.
 func NewNotFoundError(err error, kind string, id string) *NotFoundError {
-	_, file, line, _ := runtime.Caller(1)
-
 	return &NotFoundError{
 		BaseError: &BaseError{
-			Err:  err,
-			File: file,
-			Line: line,
+			Err: err,
 		},
 		Kind: kind,
 		ID:   id,
@@ -150,14 +137,11 @@ func (e *PermissionDeniedError) GRPCStatus() *status.Status {
 
 // NewPermissionDeniedError creates a permission denied error.
 func NewPermissionDeniedError(action string, kind string, id string) *PermissionDeniedError {
-	_, file, line, _ := runtime.Caller(1)
 	err := fmt.Errorf("permission denied: `%s` on %s/%s", action, kind, id)
 
 	return &PermissionDeniedError{
 		BaseError: &BaseError{
-			Err:  err,
-			File: file,
-			Line: line,
+			Err: err,
 		},
 		Action: action,
 		Kind:   kind,
@@ -176,13 +160,9 @@ func (e *UnauthenticatedError) GRPCStatus() *status.Status {
 
 // NewUnauthenticatedError creates an unauthenticated error.
 func NewUnauthenticatedError(msg string) *UnauthenticatedError {
-	_, file, line, _ := runtime.Caller(1)
-
 	return &UnauthenticatedError{
 		BaseError: &BaseError{
-			Err:  fmt.Errorf("unauthenticated: %s", msg),
-			File: file,
-			Line: line,
+			Err: fmt.Errorf("unauthenticated: %s", msg),
 		},
 	}
 }
@@ -221,13 +201,9 @@ func (e *StaleObjectError) GRPCStatus() *status.Status {
 
 // NewStaleObjectError creates a stale object error.
 func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion int32) *StaleObjectError {
-	_, file, line, _ := runtime.Caller(1)
-
 	return &StaleObjectError{
 		BaseError: &BaseError{
-			Err:  fmt.Errorf("stale object: %s/%s", kind, id),
-			File: file,
-			Line: line,
+			Err: fmt.Errorf("stale object: %s/%s", kind, id),
 		},
 		Kind:            kind,
 		ID:              id,

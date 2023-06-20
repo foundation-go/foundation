@@ -10,21 +10,27 @@ import (
 // StartWorkerOptions are the options to start a Foundation application in worker mode.
 type StartWorkerOptions struct {
 	// ProcessFunc is the function to execute in the loop iteration.
-	ProcessFunc func(ctx context.Context) error
+	ProcessFunc func(ctx context.Context) FoundationError
 
 	// Interval is the interval to run the iteration function. If function execution took less time than the interval,
 	// the worker will sleep for the remaining time of the interval. Otherwise, the function will be executed again
 	// immediately.
 	Interval time.Duration
+
+	// ModeName is the name of the worker mode. It will be used in the startup log message. Default: "worker".
+	// Meant to be used in custom modes based on the `worker` mode.
+	ModeName string
 }
 
 func NewStartWorkerOptions() StartWorkerOptions {
-	return StartWorkerOptions{}
+	return StartWorkerOptions{
+		ModeName: "worker",
+	}
 }
 
 // StartWorker starts a Foundation application in worker mode.
 func (app *Application) StartWorker(opts StartWorkerOptions) {
-	app.logStartup("worker")
+	app.logStartup(opts.ModeName)
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
@@ -44,17 +50,19 @@ Loop:
 			started := time.Now()
 
 			if err := opts.ProcessFunc(ctx); err != nil {
-				app.Logger.Errorf("Failed to run iteration: %v", err)
+				app.ProcessError(err)
 			}
 
 			// Sleep for the remaining time of the interval
-			time.Sleep(opts.Interval - time.Since(started))
+			if opts.Interval > 0 {
+				time.Sleep(opts.Interval - time.Since(started))
+			}
 		}
 	}
 
-	app.Logger.Println("Shutting down worker...")
+	app.Logger.Infof("Shutting down %s...", opts.ModeName)
 
 	app.StopComponents()
 
-	app.Logger.Println("Worker gracefully stopped")
+	app.Logger.Infof("%s gracefully stopped", opts.ModeName)
 }

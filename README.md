@@ -26,7 +26,7 @@ Foundation is built upon several proven technologies including:
 - [x] **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
 - [x] **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
 - [ ] **Health Checks**: Provide Kubernetes with health status of your application.
-- [ ] **Running Modes**: Choose the mode that best fits your needs: `gateway`, `grpc`, `http`, `worker`, or `job`.
+- [ ] **Running Modes**: Choose the mode that best fits your needs: `gateway`, `grpc`, `http`, `worker`, `events_worker`, or `job`.
 - [ ] **Tracing**: Trace and log your requests in a structured format with OpenTracing.
 - [ ] **Helpers**: A variety of helpers for common tasks.
 

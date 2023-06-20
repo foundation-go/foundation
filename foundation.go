@@ -14,14 +14,14 @@ const Version = "0.0.1"
 type Application struct {
 	Name string
 
-	// PG is a PostgreSQL connection pool.
-	PG *sql.DB
+	PG              *sql.DB
+	DatabaseEnabled bool
 
-	// KafkaConsumer is a Kafka consumer group.
-	KafkaConsumer       *kafka.Consumer
-	kafkaConsumerTopics []string
-	// KafkaProducer is a Kafka producer.
-	KafkaProducer *kafka.Producer
+	KafkaConsumer        *kafka.Consumer
+	KafkaConsumerEnabled bool
+	kafkaConsumerTopics  []string
+	KafkaProducer        *kafka.Producer
+	KafkaProducerEnabled bool
 
 	Logger *logrus.Entry
 }
@@ -29,9 +29,12 @@ type Application struct {
 // Init initializes the Foundation application.
 func Init(name string) *Application {
 	return &Application{
-		Name:                name,
-		kafkaConsumerTopics: []string{},
-		Logger:              initLogger(name),
+		Name:                 name,
+		kafkaConsumerTopics:  []string{},
+		Logger:               initLogger(name),
+		DatabaseEnabled:      GetEnvOrBool("DATABASE_ENABLED", false),
+		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
+		KafkaProducerEnabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
 	}
 }
 
@@ -46,21 +49,21 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 	}
 
 	// PostgreSQL
-	if GetEnvOrBool("DATABASE_ENABLED", false) {
+	if app.DatabaseEnabled {
 		if err := app.connectToPostgreSQL(); err != nil {
 			return fmt.Errorf("postgresql: %w", err)
 		}
 	}
 
 	// Kafka consumer
-	if GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false) {
+	if app.KafkaConsumerEnabled {
 		if err := app.connectKafkaConsumer(); err != nil {
 			return fmt.Errorf("kafka consumer: %w", err)
 		}
 	}
 
 	// Kafka producer
-	if GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false) {
+	if app.KafkaProducerEnabled {
 		if err := app.connectKafkaProducer(); err != nil {
 			return fmt.Errorf("kafka producer: %w", err)
 		}

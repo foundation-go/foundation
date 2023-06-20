@@ -47,21 +47,19 @@ func WithRequestLogger(handler http.Handler) http.Handler {
 		requestID := uuid.New().String()
 		// pass it down to app
 		request.Header.Set(fhttp.HeaderXCorrelationID, requestID)
-		// attach it to logger
-		l := log.WithField("request_id", requestID).WithField("path", request.URL.Path)
-		// and write it to HTTP response
+		// write it to HTTP response
 		writer.Header().Set(fhttp.HeaderXCorrelationID, requestID)
 
-		l.Infoln("Request started")
-
 		// Add the logger to the request context
-		ctx := fctx.SetCtxLogger(request.Context(), l)
+		l := log.WithField("request_id", requestID).WithField("path", request.URL.Path)
+		ctx := fctx.SetLogger(request.Context(), l)
 		request = request.WithContext(ctx)
 
 		// Wrap the response writer with our logging response writer
 		lrw := NewLoggingResponseWriter(writer)
 
 		// Serve the request with the wrapped response writer
+		l.Infoln("Request started")
 		handler.ServeHTTP(lrw, request)
 
 		// Calculate the duration of the request

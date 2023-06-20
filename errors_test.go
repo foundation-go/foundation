@@ -16,15 +16,9 @@ func TestInternalError(t *testing.T) {
 	err := NewInternalError(fmt.Errorf("test error"), "test")
 
 	// Check that the error message and details are correct
-	expectedSuff := "errors_test.go:16: test: test error"
+	expectedSuff := "test: test error"
 	if !strings.HasSuffix(err.Error(), expectedSuff) {
 		t.Errorf("Expected error message to end with '%s', but got '%s'", expectedSuff, err.Error())
-	}
-	if !strings.HasSuffix(err.File, "errors_test.go") {
-		t.Errorf("Expected error file to end with 'errors_test.go', but got '%s'", err.File)
-	}
-	if err.Line != 16 {
-		t.Errorf("Expected error line 16, but got %d", err.Line)
 	}
 
 	// Check that the error can be converted to a gRPC status error
