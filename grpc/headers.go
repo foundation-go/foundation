@@ -26,6 +26,11 @@ func GetCorrelationID(ctx context.Context) string {
 }
 
 // GetUserID returns the user ID from the given context.
+func GetUserID(ctx context.Context) string {
+	return GetHeader(ctx, strings.ToLower(fhttp.HeaderXUserID))
+}
+
+// GetAccessToken returns the access token from the given context.
 func GetAccessToken(ctx context.Context) string {
 	s := GetHeader(ctx, strings.ToLower(fhttp.HeaderAuthorization))
 	parts := strings.Split(s, " ")
