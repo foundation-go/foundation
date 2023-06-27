@@ -86,3 +86,25 @@ func getBrokers() (string, error) {
 
 	return strings.TrimSpace(kafkaBrokers), nil
 }
+
+// NewMessageFromEvent creates a new Kafka message from a Foundation Outbox event
+func NewMessageFromEvent(event *Event) (*kafka.Message, error) {
+	message := &kafka.Message{
+		TopicPartition: kafka.TopicPartition{
+			Topic:     &event.Topic,
+			Partition: kafka.PartitionAny,
+		},
+		Value:   event.Payload,
+		Key:     []byte(event.Key),
+		Headers: []kafka.Header{},
+	}
+
+	for k, v := range event.Headers {
+		message.Headers = append(message.Headers, kafka.Header{
+			Key:   k,
+			Value: []byte(v),
+		})
+	}
+
+	return message, nil
+}

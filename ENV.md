@@ -32,6 +32,10 @@ The following environment variables are only applicable when running in `gateway
 - `KAFKA_CONSUMER_ENABLED`: Whether to enable the Kafka consumer. Default: `false`.
 - `KAFKA_PRODUCER_ENABLED`: Whether to enable the Kafka producer. Default: `false`.
 
+## Outbox
+
+- `OUTBOX_ENABLED`: Whether to enable the outbox or publish messages directly to Kafka. Default: `false`.
+
 ## PostgreSQL
 
 - `DATABASE_ENABLED`: Whether to enable the PostgreSQL database. Default: `false`.

@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -76,15 +77,21 @@ func (app *Application) newHandleEventsFunc(handlers map[string][]EventHandler) 
 }
 
 func (app *Application) handleEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
-	// TODO: make it work when `app.DatabaseEnabled` is `false`
-	tx, err := app.PG.Begin()
-	if err != nil {
-		return NewInternalError(err, "failed to begin transaction")
-	}
-	defer tx.Rollback() // nolint:errcheck
+	var tx *sql.Tx
+	commitNeeded := false
 
-	// Add transaction to context
-	ctx = fctx.SetTX(ctx, tx)
+	if app.DatabaseEnabled {
+		tx, err := app.PG.Begin()
+		if err != nil {
+			return NewInternalError(err, "failed to begin transaction")
+		}
+		defer tx.Rollback() // nolint:errcheck
+		commitNeeded = true
+
+		// Add transaction to context
+		ctx = fctx.SetTX(ctx, tx)
+	}
+
 	// Add correlation ID to context
 	ctx = fctx.SetCorrelationID(ctx, event.Headers[KafkaHeaderCorrelationID])
 
@@ -96,14 +103,16 @@ func (app *Application) handleEvent(ctx context.Context, handler EventHandler, e
 
 	// Publish outgoing events
 	for _, e := range events {
-		if publishErr := app.PublishEvent(ctx, tx, e); publishErr != nil {
+		if publishErr := app.PublishEvent(ctx, e, tx); publishErr != nil {
 			return publishErr
 		}
 	}
 
-	// Commit transaction
-	if err = tx.Commit(); err != nil {
-		return NewInternalError(err, "failed to commit transaction")
+	if commitNeeded {
+		// Commit transaction
+		if err := tx.Commit(); err != nil {
+			return NewInternalError(err, "failed to commit transaction")
+		}
 	}
 
 	return nil

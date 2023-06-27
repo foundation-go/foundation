@@ -7,9 +7,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	fctx "github.com/ri-nat/foundation/context"
 	"github.com/ri-nat/foundation/outboxrepo"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	OutboxEnabled = GetEnvOrBool("OUTBOX_ENABLED", false)
 )
 
 // Event represents an event to be published to the outbox
@@ -68,10 +73,19 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 	return event
 }
 
-// PublishEvent publishes an event to the outbox within a provided transaction
-func (app *Application) PublishEvent(ctx context.Context, tx *sql.Tx, event *Event) FoundationError {
-	// Add default headers
-	event = addDefaultHeaders(ctx, event)
+// publishEventToOutbox publishes an event to the outbox.
+func (app *Application) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+	commitNeeded := false
+
+	if tx == nil {
+		// Start transaction
+		tx, err := app.PG.Begin()
+		if err != nil {
+			return NewInternalError(err, "failed to begin transaction")
+		}
+		defer tx.Rollback() // nolint:errcheck
+		commitNeeded = true
+	}
 
 	// Marshal headers to JSON
 	headers, err := json.Marshal(event.Headers)
@@ -79,61 +93,68 @@ func (app *Application) PublishEvent(ctx context.Context, tx *sql.Tx, event *Eve
 		return NewInternalError(err, "failed to marshal headers")
 	}
 
-	// Instantiate outbox repo
 	queries := outboxrepo.New(tx)
-
 	params := outboxrepo.CreateOutboxEventParams{
 		Topic:   event.Topic,
 		Key:     event.Key,
 		Payload: event.Payload,
 		Headers: headers,
 	}
+	// Publish event
 	if err := queries.CreateOutboxEvent(ctx, params); err != nil {
 		return NewInternalError(err, "failed to insert event into outbox")
 	}
 
-	return nil
-}
-
-// PublishEventTx publishes an event to the outbox, starting a new transaction
-func (app *Application) PublishEventTx(ctx context.Context, event *Event) FoundationError {
-	// Start transaction
-	tx, err := app.PG.Begin()
-	if err != nil {
-		return NewInternalError(err, "failed to begin transaction")
-	}
-	defer tx.Rollback() // nolint:errcheck
-
-	// Publish event
-	if err := app.PublishEvent(ctx, tx, event); err != nil {
-		return err
-	}
-
-	if err = tx.Commit(); err != nil {
-		return NewInternalError(err, "failed to commit transaction")
+	if commitNeeded {
+		if err = tx.Commit(); err != nil {
+			return NewInternalError(err, "failed to commit transaction")
+		}
 	}
 
 	return nil
 }
 
-// NewAndPublishEvent creates a new event and publishes it to the outbox
-func (app *Application) NewAndPublishEvent(ctx context.Context, tx *sql.Tx, msg proto.Message, key string, headers map[string]string) FoundationError {
-	event, err := NewEventFromProto(msg, key, headers)
+// publishEventToKafka publishes an event to the Kafka topic.
+func (app *Application) publishEventToKafka(ctx context.Context, event *Event) FoundationError {
+	message, err := NewMessageFromEvent(event)
 	if err != nil {
-		return err
+		return NewInternalError(err, "failed to create message from event")
+	}
+	ch := make(chan kafka.Event)
+	if err := app.KafkaProducer.Produce(message, ch); err != nil {
+		return NewInternalError(err, "failed to publish event to Kafka")
 	}
 
-	return app.PublishEvent(ctx, tx, event)
+	// Wait for delivery report
+	e := <-ch
+	m := e.(*kafka.Message)
+	if m.TopicPartition.Error != nil {
+		return NewInternalError(m.TopicPartition.Error, "failed to publish event to Kafka")
+	}
+
+	return nil
 }
 
-// NewAndPublishEventTx creates a new event and publishes it to the outbox within a transaction
-func (app *Application) NewAndPublishEventTx(ctx context.Context, msg proto.Message, key string, headers map[string]string) FoundationError {
+// PublishEvent publishes an event to the outbox, starting a new transaction,
+// or straight to the Kafka topic if `OUTBOX_ENABLED` is not set.
+func (app *Application) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+	event = addDefaultHeaders(ctx, event)
+
+	if OutboxEnabled {
+		return app.publishEventToOutbox(ctx, event, tx)
+	}
+
+	return app.publishEventToKafka(ctx, event)
+}
+
+// NewAndPublishEvent creates a new event and publishes it to the outbox within a transaction
+func (app *Application) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) FoundationError {
 	event, err := NewEventFromProto(msg, key, headers)
 	if err != nil {
 		return err
 	}
 
-	return app.PublishEventTx(ctx, event)
+	return app.PublishEvent(ctx, event, tx)
 }
 
 // WithTransaction executes the given function in a transaction. If the function
@@ -154,7 +175,7 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 
 	// Publish event (if any)
 	if event != nil {
-		if err = app.PublishEvent(ctx, tx, event); err != nil {
+		if err = app.PublishEvent(ctx, event, tx); err != nil {
 			return NewInternalError(err, "failed to publish event")
 		}
 	}
