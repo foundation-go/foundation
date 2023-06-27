@@ -43,6 +43,10 @@ func NewEventFromProto(msg proto.Message, key string, headers map[string]string)
 	// Construct topic name from proto name
 	topic := protoNameToTopic(protoName)
 
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+
 	return &Event{
 		Topic:     topic,
 		Key:       key,

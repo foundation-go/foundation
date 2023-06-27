@@ -11,7 +11,6 @@ func initLogger(appName string) *log.Entry {
 
 	switch AppEnv() {
 	case EnvProduction:
-		logger.SetReportCaller(true)
 		logger.SetFormatter(&log.JSONFormatter{})
 	default:
 		logger.SetFormatter(&log.TextFormatter{
