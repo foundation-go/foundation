@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -11,6 +12,9 @@ type CtxKey string
 
 const (
 	CtxKeyCorrelationID CtxKey = "correlation_id"
+	CtxKeyUserID        CtxKey = "user_id"
+	CtxKeyAccessToken   CtxKey = "access_token"
+	CtxKeyauthenticated CtxKey = "authenticated"
 	CtxKeyLogger        CtxKey = "logger"
 	CtxKeyTX            CtxKey = "tx"
 )
@@ -23,6 +27,36 @@ func GetCorrelationID(ctx context.Context) string {
 // SetCorrelationID sets the correlation ID in the context.
 func SetCorrelationID(ctx context.Context, correlationID string) context.Context {
 	return context.WithValue(ctx, CtxKeyCorrelationID, correlationID)
+}
+
+// GetUserID returns the user ID from the context.
+func GetUserID(ctx context.Context) uuid.UUID {
+	return ctx.Value(CtxKeyUserID).(uuid.UUID)
+}
+
+// SetUserID sets the user ID in the context.
+func SetUserID(ctx context.Context, userID uuid.UUID) context.Context {
+	return context.WithValue(ctx, CtxKeyUserID, userID)
+}
+
+// GetAccessToken returns the access token from the context.
+func GetAccessToken(ctx context.Context) string {
+	return ctx.Value(CtxKeyAccessToken).(string)
+}
+
+// SetAccessToken sets the access token in the context.
+func SetAccessToken(ctx context.Context, accessToken string) context.Context {
+	return context.WithValue(ctx, CtxKeyAccessToken, accessToken)
+}
+
+// GetAuthenticated returns the authenticated flag from the context.
+func GetAuthenticated(ctx context.Context) bool {
+	return ctx.Value(CtxKeyauthenticated).(bool)
+}
+
+// SetAuthenticated sets the authenticated flag in the context.
+func SetAuthenticated(ctx context.Context, authenticated bool) context.Context {
+	return context.WithValue(ctx, CtxKeyauthenticated, authenticated)
 }
 
 // GetLogger returns the logger from the context.

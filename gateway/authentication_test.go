@@ -79,21 +79,6 @@ func TestWithAuthenticationDetails(t *testing.T) {
 	if recorder.Code != http.StatusOK {
 		t.Errorf("Expected status code %d, but got %d", http.StatusInternalServerError, recorder.Code)
 	}
-
-	//
-	// Test server error
-	//
-	recorder = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Header.Set(fhttp.HeaderAuthorization, "error")
-
-	// Call the middleware with the mock handler and authentication handler
-	WithAuthenticationDetails(mockHandler, mockAuthHandler).ServeHTTP(recorder, req)
-
-	// Check that the response code is Internal Server Error
-	if recorder.Code != http.StatusInternalServerError {
-		t.Errorf("Expected status code %d, but got %d", http.StatusInternalServerError, recorder.Code)
-	}
 }
 
 func TestWithAuthentication(t *testing.T) {

@@ -106,13 +106,10 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 		// Authenticate the token
 		result, err := authenticate(token)
 		if err != nil {
-			http.Error(w, "", http.StatusInternalServerError)
-			return
+			result = &AuthenticationResult{}
 		}
 
-		// Set authenticated headers
 		r = setAuthHeaders(r, result.IsAuthenticated, result.UserID)
-
 		// Continue to the next handler
 		handler.ServeHTTP(w, r)
 	})

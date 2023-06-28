@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	fg "github.com/ri-nat/foundation/grpc"
 	"google.golang.org/grpc"
 )
 
@@ -40,6 +41,8 @@ func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	//
 	// TODO: Work correctly with interceptors from options
 	interceptors := []grpc.UnaryServerInterceptor{
+		fg.MetadataInterceptor,
+		fg.LoggingInterceptor(app.Logger),
 		app.foundationErrorToStatusInterceptor,
 	}
 	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))

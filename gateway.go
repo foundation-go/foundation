@@ -87,7 +87,7 @@ func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptio
 
 	// General middleware
 	middleware := []func(http.Handler) http.Handler{
-		gateway.WithRequestLogger,
+		gateway.WithRequestLogger(app.Logger),
 		gateway.WithCORSEnabled,
 	}
 	for _, m := range middleware {
