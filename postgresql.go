@@ -58,3 +58,11 @@ func NewNullInt64(num *int64) (res sql.NullInt64) {
 
 	return
 }
+
+func NewNullString(str *string) (res sql.NullString) {
+	if str != nil {
+		res.Scan(*str) // nolint: errcheck
+	}
+
+	return
+}
