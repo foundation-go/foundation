@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	hydra "github.com/ory/hydra-client-go"
+	hydra "github.com/ory/hydra-client-go/v2"
 	kratos "github.com/ory/kratos-client-go"
 
 	fhttp "github.com/ri-nat/foundation/http"
@@ -32,15 +32,15 @@ func WithHydraAuthenticationDetails(handler http.Handler) http.Handler {
 
 			// Create a new Hydra SDK client
 			config := hydra.NewConfiguration()
-			config.Servers = append(config.Servers, hydra.ServerConfiguration{
-				URL: hydraAdminURL,
-			})
+			config.Servers = hydra.ServerConfigurations{
+				{URL: hydraAdminURL},
+			}
 			client := hydra.NewAPIClient(config)
 
 			// Authenticate the token using ORY Hydra
-			req := client.AdminApi.IntrospectOAuth2Token(r.Context())
-			req.Token(token)
-			resp, _, err := client.AdminApi.IntrospectOAuth2TokenExecute(req)
+			req := client.OAuth2Api.IntrospectOAuth2Token(r.Context())
+			req = req.Token(token)
+			resp, _, err := client.OAuth2Api.IntrospectOAuth2TokenExecute(req)
 			if err != nil {
 				return nil, err
 			}

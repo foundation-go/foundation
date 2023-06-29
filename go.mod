@@ -9,7 +9,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0
 	github.com/jackc/pgx/v5 v5.4.1
 	github.com/joho/godotenv v1.5.1
-	github.com/ory/hydra-client-go v1.11.8
+	github.com/ory/hydra-client-go/v2 v2.1.1
 	github.com/ory/kratos-client-go v0.13.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.16.0
