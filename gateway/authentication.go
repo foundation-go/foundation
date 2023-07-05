@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	hydra "github.com/ory/hydra-client-go/v2"
 	kratos "github.com/ory/kratos-client-go"
@@ -102,6 +103,9 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the token from the request header
 		token := r.Header.Get(fhttp.HeaderAuthorization)
+		// Strip any Bearer prefix
+		tokenParts := strings.Split(token, " ")
+		token = tokenParts[len(tokenParts)-1]
 
 		// Authenticate the token
 		result, err := authenticate(token)

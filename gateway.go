@@ -85,20 +85,11 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
 	app.Logger.Info("Using middleware:")
 
-	// General middleware
-	middleware := []func(http.Handler) http.Handler{
-		gateway.WithRequestLogger(app.Logger),
-		gateway.WithCORSEnabled,
-	}
-	for _, m := range middleware {
+	// Custom middleware
+	for i := len(opts.Middleware) - 1; i >= 0; i-- {
+		m := opts.Middleware[i]
 		app.printMiddlewareName(m)
 		mux = m(mux)
-	}
-
-	// Authentication details middleware
-	if opts.AuthenticationDetailsMiddleware != nil {
-		app.printMiddlewareName(opts.AuthenticationDetailsMiddleware)
-		mux = opts.AuthenticationDetailsMiddleware(mux)
 	}
 
 	// Authentication middleware
@@ -107,8 +98,19 @@ func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptio
 		mux = gateway.WithAuthentication(mux, opts.AuthenticationExcept)
 	}
 
-	// Custom middleware
-	for _, m := range opts.Middleware {
+	// Authentication details middleware
+	if opts.AuthenticationDetailsMiddleware != nil {
+		app.printMiddlewareName(opts.AuthenticationDetailsMiddleware)
+		mux = opts.AuthenticationDetailsMiddleware(mux)
+	}
+
+	// General middleware
+	middleware := []func(http.Handler) http.Handler{
+		gateway.WithRequestLogger(app.Logger),
+		gateway.WithCORSEnabled,
+	}
+	for i := len(middleware) - 1; i >= 0; i-- {
+		m := middleware[i]
 		app.printMiddlewareName(m)
 		mux = m(mux)
 	}
