@@ -83,7 +83,7 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 }
 
 func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
-	app.Logger.Info("Using middleware:")
+	app.Logger.Info("Using middleware (in reverse order):")
 
 	// Custom middleware
 	for i := len(opts.Middleware) - 1; i >= 0; i-- {
