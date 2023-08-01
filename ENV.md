@@ -6,7 +6,6 @@ The following environment variables are available for all running modes.
 
 - `APP_ENV`: Application environment. Default: `development`. Possible values: `development`, `production`.
 - `LOG_LEVEL`: Log level. Default: `INFO`.
-- `METRICS_PORT`: Port to expose metrics on. Default: `51077`.
 - `PORT`: Port to listen on. Default: `51051`.
 
 ## Authentication
@@ -21,9 +20,10 @@ The following environment variables are only applicable when running in `gateway
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service.
 
-## Metrics
+## Insight
 
-- `METRICS_ENABLED`: Whether to enable Prometheus metrics endpoint. Default: `false`.
+- `INSIGHT_ENABLED`: Whether to enable the server with `/health` and `/metrics`. Default: `true`.
+- `INSIGHT_PORT`: Port to expose health check on. Default: `51077`.
 
 ## Kafka
 

@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const Version = "0.0.2"
+const Version = "0.1.0"
 
 // Application represents a Foundation application.
 type Application struct {
@@ -25,7 +25,7 @@ type Application struct {
 
 	Logger *logrus.Entry
 
-	MetricsServer *http.Server
+	InsightServer *http.Server
 }
 
 type Config struct {
@@ -36,8 +36,8 @@ type Config struct {
 	KafkaConsumerEnabled bool
 	KafkaConsumerTopics  []string
 	KafkaProducerEnabled bool
-	MetricsEnabled       bool
-	MetricsPort          int
+	InsightEnabled       bool
+	InsightPort          int
 }
 
 // NewConfig returns a new Config with values populated from environment variables.
@@ -50,8 +50,8 @@ func NewConfig() *Config {
 		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
 		KafkaConsumerTopics:  nil,
 		KafkaProducerEnabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
-		MetricsEnabled:       GetEnvOrBool("METRICS_ENABLED", false),
-		MetricsPort:          GetEnvOrInt("METRICS_PORT", 51077),
+		InsightEnabled:       GetEnvOrBool("INSIGHT_ENABLED", true),
+		InsightPort:          GetEnvOrInt("INSIGHT_PORT", 51077),
 	}
 }
 
@@ -95,9 +95,9 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 		}
 	}
 
-	// Metrics
-	if app.Config.MetricsEnabled {
-		app.StartMetricsServer()
+	// Insight server
+	if app.Config.InsightEnabled {
+		app.StartInsightServer()
 	}
 
 	return nil
@@ -120,13 +120,13 @@ func (app *Application) StopComponents() {
 		app.KafkaProducer.Close()
 	}
 
-	// Metrics
-	if app.MetricsServer != nil {
+	// Insight
+	if app.InsightServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := app.MetricsServer.Shutdown(ctx); err != nil {
-			app.Logger.Errorf("Failed to shut down metrics server: %v", err)
+		if err := app.InsightServer.Shutdown(ctx); err != nil {
+			app.Logger.Errorf("Failed to shut down insight server: %v", err)
 		}
 	}
 }

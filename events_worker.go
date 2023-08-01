@@ -127,8 +127,10 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 }
 
 func (app *Application) processEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
-	var tx *sql.Tx
-	commitNeeded := false
+	var (
+		tx         *sql.Tx
+		needCommit bool
+	)
 
 	if app.Config.DatabaseEnabled {
 		tx, err := app.PG.Begin()
@@ -136,7 +138,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 			return NewInternalError(err, "failed to begin transaction")
 		}
 		defer tx.Rollback() // nolint:errcheck
-		commitNeeded = true
+		needCommit = true
 
 		// Add transaction to context
 		ctx = fctx.SetTX(ctx, tx)
@@ -158,7 +160,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 		}
 	}
 
-	if commitNeeded {
+	if needCommit {
 		// Commit transaction
 		if err := tx.Commit(); err != nil {
 			return NewInternalError(err, "failed to commit transaction")
