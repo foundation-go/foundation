@@ -30,7 +30,7 @@ func initLogger(appName string) *log.Entry {
 
 func (app *Application) logStartup(mode string) {
 	app.Logger.Infof("Starting application")
-	app.Logger.Infof("- Mode:        %s", mode)
-	app.Logger.Infof("- Environment: %s", AppEnv())
-	app.Logger.Infof("- Foundation:  v%s", Version)
+	app.Logger.Infof(" - Mode:        %s", mode)
+	app.Logger.Infof(" - Environment: %s", AppEnv())
+	app.Logger.Infof(" - Foundation:  v%s", Version)
 }

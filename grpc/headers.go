@@ -26,7 +26,20 @@ func GetCorrelationID(ctx context.Context) string {
 	return GetHeader(ctx, strings.ToLower(fhttp.HeaderXCorrelationID))
 }
 
-// GetUserID returns the user ID from the given context.
+// GetClientID returns the OAuth client ID from the given context. It assumes that the OAuth client ID is a UUID, and
+// returns `uuid.Nil` (`00000000-0000-0000-0000-000000000000`) if the client ID is not a valid UUID.
+func GetClientID(ctx context.Context) uuid.UUID {
+	idStr := GetHeader(ctx, strings.ToLower(fhttp.HeaderXClientID))
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return uuid.Nil
+	}
+
+	return id
+}
+
+// GetUserID returns the user ID from the given context. It assumes that the user ID is a UUID, and returns
+// `uuid.Nil` (`00000000-0000-0000-0000-000000000000`) if the user ID is not a valid UUID.
 func GetUserID(ctx context.Context) uuid.UUID {
 	idStr := GetHeader(ctx, strings.ToLower(fhttp.HeaderXUserID))
 	id, err := uuid.Parse(idStr)

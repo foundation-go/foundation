@@ -14,7 +14,6 @@ The following environment variables are available for all running modes.
 The following environment variables are only applicable when using authentication.
 
 - `HYDRA_ADMIN_URL`: The URL of the Hydra Admin API. Required for the `hydra` authentication provider.
-- `KRATOS_FRONTEND_URL`: The URL of the Kratos Public API. Required for the `kratos` authentication provider.
 
 ## Gateway
 
@@ -38,6 +37,5 @@ The following environment variables are only applicable when running in `gateway
 
 ## PostgreSQL
 
-- `DATABASE_ENABLED`: Whether to enable the PostgreSQL database. Default: `false`.
 - `DATABASE_POOL`: The maximum number of open connections to the database. Default: `5`.
 - `DATABASE_URL`: The URL of the PostgreSQL database. Must be set when using the PostgreSQL database.

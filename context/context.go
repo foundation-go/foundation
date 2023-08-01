@@ -12,6 +12,7 @@ type CtxKey string
 
 const (
 	CtxKeyCorrelationID CtxKey = "correlation_id"
+	CtxKeyClientID      CtxKey = "client_id"
 	CtxKeyUserID        CtxKey = "user_id"
 	CtxKeyAccessToken   CtxKey = "access_token"
 	CtxKeyauthenticated CtxKey = "authenticated"
@@ -27,6 +28,16 @@ func GetCorrelationID(ctx context.Context) string {
 // SetCorrelationID sets the correlation ID in the context.
 func SetCorrelationID(ctx context.Context, correlationID string) context.Context {
 	return context.WithValue(ctx, CtxKeyCorrelationID, correlationID)
+}
+
+// GetClientID returns the OAuth client ID from the context.
+func GetClientID(ctx context.Context) uuid.UUID {
+	return ctx.Value(CtxKeyClientID).(uuid.UUID)
+}
+
+// SetClientID sets the OAuth client ID in the context.
+func SetClientID(ctx context.Context, clientID uuid.UUID) context.Context {
+	return context.WithValue(ctx, CtxKeyClientID, clientID)
 }
 
 // GetUserID returns the user ID from the context.

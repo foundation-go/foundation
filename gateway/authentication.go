@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	hydra "github.com/ory/hydra-client-go/v2"
-	kratos "github.com/ory/kratos-client-go"
 
 	fhttp "github.com/ri-nat/foundation/http"
 )
@@ -19,6 +18,7 @@ type AuthenticationHandler func(token string) (*AuthenticationResult, error)
 // AuthenticationResult is the result of an authentication
 type AuthenticationResult struct {
 	IsAuthenticated bool
+	ClientID        string
 	UserID          string
 }
 
@@ -54,45 +54,8 @@ func WithHydraAuthenticationDetails(handler http.Handler) http.Handler {
 			// Return the authentication result
 			return &AuthenticationResult{
 				IsAuthenticated: true,
+				ClientID:        resp.GetClientId(),
 				UserID:          resp.GetSub(),
-			}, nil
-		}).ServeHTTP(w, r)
-	})
-}
-
-// WithKratosAuthenticationDetails is a middleware that fetches the authentication details using ORY Kratos
-func WithKratosAuthenticationDetails(handler http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		WithAuthenticationDetails(handler, func(token string) (*AuthenticationResult, error) {
-			kratosFrontendURL := os.Getenv("KRATOS_FRONTEND_URL")
-			if kratosFrontendURL == "" {
-				return nil, errors.New("KRATOS_FRONTEND_URL is not set")
-			}
-
-			// Create a new Kratos SDK client
-			cfg := kratos.NewConfiguration()
-			cfg.Servers = append(cfg.Servers, kratos.ServerConfiguration{
-				URL: kratosFrontendURL,
-			})
-			client := kratos.NewAPIClient(cfg)
-
-			// Authenticate the token using ORY Kratos
-			req := client.FrontendApi.ToSession(r.Context())
-			req.XSessionToken(token)
-			resp, _, err := client.FrontendApi.ToSessionExecute(req)
-			if err != nil {
-				return nil, err
-			}
-
-			// Check if the token is valid
-			if !resp.GetActive() {
-				return &AuthenticationResult{}, nil
-			}
-
-			// Return the authentication result
-			return &AuthenticationResult{
-				IsAuthenticated: true,
-				UserID:          resp.Identity.Id,
 			}, nil
 		}).ServeHTTP(w, r)
 	})
@@ -113,35 +76,38 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 			result = &AuthenticationResult{}
 		}
 
-		r = setAuthHeaders(r, result.IsAuthenticated, result.UserID)
+		r = setAuthHeaders(r, result)
 		// Continue to the next handler
 		handler.ServeHTTP(w, r)
 	})
 }
 
 // WithAuthentication is a middleware that forces the request to be authenticated
-func WithAuthentication(handler http.Handler, except []string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if the request path is in the exceptions list
-		for _, path := range except {
-			if path == r.URL.Path {
-				handler.ServeHTTP(w, r)
+func WithAuthentication(except []string) func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if the request path is in the exceptions list
+			for _, path := range except {
+				if path == r.URL.Path {
+					handler.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			if r.Header.Get(fhttp.HeaderXAuthenticated) != "true" {
+				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-		}
 
-		if r.Header.Get(fhttp.HeaderXAuthenticated) != "true" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-
-		handler.ServeHTTP(w, r)
-	})
+			handler.ServeHTTP(w, r)
+		})
+	}
 }
 
-func setAuthHeaders(r *http.Request, isAuthenticated bool, userID string) *http.Request {
-	r.Header.Set(fhttp.HeaderXAuthenticated, strconv.FormatBool(isAuthenticated))
-	r.Header.Set(fhttp.HeaderXUserID, userID)
+func setAuthHeaders(r *http.Request, result *AuthenticationResult) *http.Request {
+	r.Header.Set(fhttp.HeaderXAuthenticated, strconv.FormatBool(result.IsAuthenticated))
+	r.Header.Set(fhttp.HeaderXClientID, result.ClientID)
+	r.Header.Set(fhttp.HeaderXUserID, result.UserID)
 
 	return r
 }

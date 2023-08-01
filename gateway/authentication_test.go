@@ -94,7 +94,7 @@ func TestWithAuthentication(t *testing.T) {
 	// Test with authenticated request
 	req.Header.Set(fhttp.HeaderXAuthenticated, "true")
 	recorder := httptest.NewRecorder()
-	WithAuthentication(mockHandler, []string{}).ServeHTTP(recorder, req)
+	WithAuthentication([]string{})(mockHandler).ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusOK {
 		t.Errorf("Expected status code %d, but got %d", http.StatusOK, recorder.Code)
 	}
@@ -102,7 +102,7 @@ func TestWithAuthentication(t *testing.T) {
 	// Test with unauthenticated request
 	req.Header.Del(fhttp.HeaderXAuthenticated)
 	recorder = httptest.NewRecorder()
-	WithAuthentication(mockHandler, []string{}).ServeHTTP(recorder, req)
+	WithAuthentication([]string{})(mockHandler).ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status code %d, but got %d", http.StatusUnauthorized, recorder.Code)
 	}
@@ -110,7 +110,7 @@ func TestWithAuthentication(t *testing.T) {
 	// Test `except` option
 	req.URL.Path = "/signup"
 	recorder = httptest.NewRecorder()
-	WithAuthentication(mockHandler, []string{"/signup"}).ServeHTTP(recorder, req)
+	WithAuthentication([]string{"/signup"})(mockHandler).ServeHTTP(recorder, req)
 	if recorder.Code != http.StatusOK {
 		t.Errorf("Expected status code %d, but got %d", http.StatusOK, recorder.Code)
 	}

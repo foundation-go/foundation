@@ -20,6 +20,8 @@ type StartWorkerOptions struct {
 	// ModeName is the name of the worker mode. It will be used in the startup log message. Default: "worker".
 	// Meant to be used in custom modes based on the `worker` mode.
 	ModeName string
+
+	StartComponentsOptions []StartComponentsOption
 }
 
 func NewStartWorkerOptions() StartWorkerOptions {
@@ -33,7 +35,7 @@ func (app *Application) StartWorker(opts StartWorkerOptions) {
 	app.logStartup(opts.ModeName)
 
 	// Start common components
-	if err := app.StartComponents(); err != nil {
+	if err := app.StartComponents(opts.StartComponentsOptions...); err != nil {
 		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 

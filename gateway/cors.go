@@ -34,7 +34,7 @@ func WithCORSEnabled(handler http.Handler) http.Handler {
 		w.Header().Set(fhttp.HeaderAccessControlAllowMethods, http.MethodPost)
 		w.Header().Set(fhttp.HeaderAccessControlAllowHeaders, strings.Join(corsAllowedHeaders, ", "))
 		w.Header().Set(fhttp.HeaderAccessControlExposeHeaders, strings.Join(corsExposedHeaders, ", "))
-		w.Header().Set(fhttp.HeaderAccessControlMaxAge, fmt.Sprintf("%f", corsMaxAge.Seconds()))
+		w.Header().Set(fhttp.HeaderAccessControlMaxAge, fmt.Sprintf("%d", int(corsMaxAge.Seconds())))
 
 		// If the request is an OPTIONS request, we can safely return here.
 		if r.Method == http.MethodOptions {

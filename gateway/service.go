@@ -30,12 +30,17 @@ func RegisterServices(services []Service, muxOpts ...runtime.ServeMuxOption) (ht
 
 	// Register gRPC server endpoints
 	for _, service := range services {
+		errPrefix := fmt.Sprintf("failed to register service `%s`", service.Name)
+
 		// Fetch gRPC server endpoint from environment variable
 		endpointVarName := fmt.Sprintf("GRPC_%s_ENDPOINT", strings.ToUpper(service.Name))
 		endpoint := os.Getenv(endpointVarName)
+		if endpoint == "" {
+			return nil, fmt.Errorf("%s: environment variable `%s` is not set", errPrefix, endpointVarName)
+		}
 
 		if err := service.Register(ctx, mux, endpoint, opts); err != nil {
-			return nil, fmt.Errorf("failed to register gRPC endpoint for service `%s`: %v", service.Name, err)
+			return nil, fmt.Errorf("%s: %v", errPrefix, err)
 		}
 	}
 

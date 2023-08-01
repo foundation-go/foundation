@@ -7,10 +7,11 @@ import (
 )
 
 func IncomingHeaderMatcher(key string) (string, bool) {
-	switch key {
-	case fhttp.HeaderXCorrelationID, fhttp.HeaderXAuthenticated, fhttp.HeaderXUserID:
-		return key, true
-	default:
-		return runtime.DefaultHeaderMatcher(key)
+	for _, header := range fhttp.FoundationHeaders {
+		if header == key {
+			return key, true
+		}
 	}
+
+	return runtime.DefaultHeaderMatcher(key)
 }

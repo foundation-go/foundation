@@ -3,7 +3,6 @@ package foundation
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -18,20 +17,20 @@ const (
 // WithKafkaConsumerTopics sets the Kafka consumer topics.
 func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
 	return func(app *Application) {
-		app.kafkaConsumerTopics = topics
+		app.Config.KafkaConsumerTopics = topics
 	}
 }
 
 func (app *Application) connectKafkaConsumer() error {
 	app.Logger.Info("Connecting to Kafka as a consumer...")
 
-	brokers, err := getBrokers()
+	brokers, err := app.getBrokers()
 	if err != nil {
 		return err
 	}
 
-	if len(app.kafkaConsumerTopics) == 0 {
-		return errors.New("you must set topics during the application initialization")
+	if len(app.Config.KafkaConsumerTopics) == 0 {
+		return errors.New("you must specify topics during the application initialization using the `WithKafkaConsumerTopics`")
 	}
 
 	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
@@ -44,8 +43,9 @@ func (app *Application) connectKafkaConsumer() error {
 		return err
 	}
 
-	err = consumer.SubscribeTopics(app.kafkaConsumerTopics, nil)
-	if err != nil {
+	app.Logger.Debugf("Kafka consumer topics: %v", app.Config.KafkaConsumerTopics)
+
+	if err = consumer.SubscribeTopics(app.Config.KafkaConsumerTopics, nil); err != nil {
 		return err
 	}
 
@@ -57,7 +57,7 @@ func (app *Application) connectKafkaConsumer() error {
 func (app *Application) connectKafkaProducer() error {
 	app.Logger.Info("Connecting to Kafka as a producer...")
 
-	brokers, err := getBrokers()
+	brokers, err := app.getBrokers()
 	if err != nil {
 		return err
 	}
@@ -68,8 +68,7 @@ func (app *Application) connectKafkaProducer() error {
 	}
 
 	// Test the connection
-	_, err = producer.GetMetadata(nil, true, 1000)
-	if err != nil {
+	if _, err = producer.GetMetadata(nil, true, 1000); err != nil {
 		return err
 	}
 
@@ -78,13 +77,12 @@ func (app *Application) connectKafkaProducer() error {
 	return nil
 }
 
-func getBrokers() (string, error) {
-	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
-	if kafkaBrokers == "" {
+func (app *Application) getBrokers() (string, error) {
+	if app.Config.KafkaBrokers == "" {
 		return "", errors.New("KAFKA_BROKERS variable is not set")
 	}
 
-	return strings.TrimSpace(kafkaBrokers), nil
+	return strings.TrimSpace(app.Config.KafkaBrokers), nil
 }
 
 // NewMessageFromEvent creates a new Kafka message from a Foundation Outbox event

@@ -16,6 +16,7 @@ Foundation is built upon several proven technologies including:
 - **gRPC Gateway**: A gRPC to JSON reverse proxy.
 - **Protocol Buffers**: A language-neutral extensible mechanism for serializing structured data, used for gRPC and Kafka message serialization.
 - **Kafka**: A powerful distributed streaming platform.
+- **OAuth 2.0**: An industry-standard authorization framework.
 - **PostgreSQL**: A robust open-source relational database system.
 - **WebSockets**: Enabling real-time, bi-directional, and full-duplex communication channels over TCP connections.
 
@@ -37,7 +38,6 @@ Foundation comes with built-in support for:
 - [x] **PostgreSQL**: Easily connect to a PostgreSQL database.
 - [x] **Dotenv**: Load environment variables from .env files.
 - [x] **ORY Hydra**: Authenticate users on a gateway with ORY Hydra.
-- [x] **ORY Kratos**: Authenticate users on a gateway with ORY Kratos.
 - [x] **gRPC Gateway**: Expose gRPC services as JSON endpoints.
 - [x] **Kafka**: Produce and consume messages with Kafka (via `confluent-kafka-go`).
 - [ ] **Sentry**: Report errors to Sentry.

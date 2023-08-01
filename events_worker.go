@@ -3,6 +3,8 @@ package foundation
 import (
 	"context"
 	"database/sql"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
@@ -17,13 +19,57 @@ type EventHandler interface {
 // StartEventsWorkerOptions represents the options for starting an events worker
 type StartEventsWorkerOptions struct {
 	Handlers map[string][]EventHandler
+	Topics   []string
+}
+
+func (opts *StartEventsWorkerOptions) GetTopics() []string {
+	// If topics are specified in the options, use them
+	if len(opts.Topics) > 0 {
+		return opts.Topics
+	}
+
+	// Otherwise, build topics from events we're handling
+	topics := []string{}
+
+	if len(opts.Handlers) == 0 {
+		return nil
+	}
+
+	for protoName := range opts.Handlers {
+		// Collect service names from event message names
+		// project.service.SomeEvent -> project.service
+		topic := protoName[:strings.LastIndex(protoName, ".")]
+
+		if topic != "" {
+			// Add topic to the list if it's not already there
+			found := false
+			for _, t := range topics {
+				if t == topic {
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				topics = append(topics, topic)
+			}
+		}
+	}
+
+	// Sort topics for consistency
+	sort.Strings(topics)
+
+	return topics
 }
 
 // StartEventsWorker starts a worker that handles events
 func (app *Application) StartEventsWorker(opts *StartEventsWorkerOptions) {
 	wOpts := NewStartWorkerOptions()
 	wOpts.ModeName = "events_worker"
-	wOpts.ProcessFunc = app.newHandleEventsFunc(opts.Handlers)
+	wOpts.ProcessFunc = app.newProcessEventFunc(opts.Handlers)
+	wOpts.StartComponentsOptions = []StartComponentsOption{
+		WithKafkaConsumerTopics(opts.GetTopics()...),
+	}
 
 	app.StartWorker(wOpts)
 }
@@ -44,7 +90,7 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (app *Application) newHandleEventsFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
+func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
 	return func(ctx context.Context) FoundationError {
 		msg, err := app.KafkaConsumer.ReadMessage(-1)
 		if err != nil {
@@ -53,34 +99,38 @@ func (app *Application) newHandleEventsFunc(handlers map[string][]EventHandler) 
 
 		event := newEventFromKafkaMessage(msg)
 
-		for _, handler := range handlers[event.ProtoName] {
-			if handleErr := app.handleEvent(ctx, handler, event); handleErr != nil {
-				// For now, we commit the message even if the handler failed to process it.
-				//
-				// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
-				// Or maybe publish the message to a dead-letter topic.
-				if commitErr := app.CommitMessage(msg); commitErr != nil {
-					return commitErr
-				}
+		var handleErr FoundationError
 
-				return handleErr
+		for _, handler := range handlers[event.ProtoName] {
+			handleErr = app.processEvent(ctx, handler, event)
+
+			if handleErr != nil {
+				// We just stop all the subsequent handlers from processing the event if one of them failed.
+				//
+				// TODO: Consider adding a configuration option to allow the user to choose whether to stop after
+				// specific handler failed or not. It would require to add ability to return multiple errors from
+				// this function.
+				break
 			}
 		}
 
-		// Commit message
+		// For now, we commit the message even if the handler failed to process it.
+		//
+		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
+		// Or maybe publish the message to a dead-letter topic.
 		if commitErr := app.CommitMessage(msg); commitErr != nil {
 			return commitErr
 		}
 
-		return nil
+		return handleErr
 	}
 }
 
-func (app *Application) handleEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
+func (app *Application) processEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
 	var tx *sql.Tx
 	commitNeeded := false
 
-	if app.DatabaseEnabled {
+	if app.Config.DatabaseEnabled {
 		tx, err := app.PG.Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")

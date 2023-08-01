@@ -3,7 +3,6 @@ package foundation
 import (
 	"database/sql"
 	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -13,8 +12,8 @@ import (
 func (app *Application) connectToPostgreSQL() error {
 	app.Logger.Info("Connecting to PostgreSQL...")
 
-	dbURL := os.Getenv("DATABASE_URL")
-	connConfig, err := pgx.ParseConfig(dbURL)
+	connConfig, err := pgx.ParseConfig(app.Config.DatabaseURL)
+	app.Logger.Debugf("PostgreSQL connection config: %+v", connConfig)
 	if err != nil {
 		return fmt.Errorf("can't parse DATABASE_URL variable: %w", err)
 	}
@@ -29,7 +28,7 @@ func (app *Application) connectToPostgreSQL() error {
 		return err
 	}
 
-	db.SetMaxOpenConns(GetEnvOrInt("DATABASE_POOL", 5))
+	db.SetMaxOpenConns(app.Config.DatabasePool)
 	app.PG = db
 
 	return nil

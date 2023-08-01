@@ -44,7 +44,11 @@ func WithRequestLogger(l *log.Entry) func(http.Handler) http.Handler {
 			writer.Header().Set(fhttp.HeaderXCorrelationID, requestID)
 
 			// Add the logger to the request context
-			l = l.WithField("request_id", requestID).WithField("path", request.URL.Path)
+			l = l.WithFields(log.Fields{
+				"method":     request.Method,
+				"path":       request.URL.Path,
+				"request_id": requestID,
+			})
 			ctx := fctx.SetLogger(request.Context(), l)
 			request = request.WithContext(ctx)
 
@@ -57,7 +61,7 @@ func WithRequestLogger(l *log.Entry) func(http.Handler) http.Handler {
 
 			// Calculate the duration of the request
 			duration := time.Since(started)
-			l.WithField("duration", duration).Infoln("Request finished")
+			l.WithField("duration_ms", duration.Milliseconds()).WithField("status", lrw.statusCode).Infoln("Request finished")
 		})
 	}
 }

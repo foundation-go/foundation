@@ -8,17 +8,16 @@ import (
 )
 
 func (app *Application) StartMetricsServer() {
-	if !GetEnvOrBool("METRICS_ENABLED", false) {
-		return
+	app.Logger.Infof("Exposing Prometheus metrics on http://0.0.0.0:%d", app.Config.MetricsPort)
+
+	app.MetricsServer = &http.Server{
+		Addr:    fmt.Sprintf(":%d", app.Config.MetricsPort),
+		Handler: promhttp.Handler(),
 	}
 
-	metricsPort := GetEnvOrInt("METRICS_PORT", 51077)
-	app.Logger.Infof("Exposing Prometheus metrics on http://0.0.0.0:%d", metricsPort)
-
-	http.Handle("/", promhttp.Handler())
-
-	err := http.ListenAndServe(fmt.Sprintf(":%d", metricsPort), nil)
-	if err != nil {
-		app.Logger.Fatalf("Failed to start metrics server: %v", err)
-	}
+	go func() {
+		if err := app.MetricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			app.Logger.Fatalf("Failed to start metrics server: %v", err)
+		}
+	}()
 }

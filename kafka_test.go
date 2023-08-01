@@ -1,21 +1,22 @@
 package foundation
 
 import (
-	"os"
 	"testing"
 )
 
 func TestGetBrokers(t *testing.T) {
+	app := Application{Config: &Config{}}
+
 	// Test case 1: KAFKA_BROKERS is not set
-	os.Setenv("KAFKA_BROKERS", "")
-	_, err := getBrokers()
+	app.Config.KafkaBrokers = ""
+	_, err := app.getBrokers()
 	if err == nil {
 		t.Errorf("Expected error, but got nil")
 	}
 
 	// Test case 2: KAFKA_BROKERS is set with one broker
-	os.Setenv("KAFKA_BROKERS", "localhost:9092")
-	brokers, err := getBrokers()
+	app.Config.KafkaBrokers = "localhost:9092"
+	brokers, err := app.getBrokers()
 	if err != nil {
 		t.Errorf("Expected nil error, but got %v", err)
 	}
@@ -24,8 +25,8 @@ func TestGetBrokers(t *testing.T) {
 	}
 
 	// Test case 3: KAFKA_BROKERS is set with space on both sides
-	os.Setenv("KAFKA_BROKERS", " localhost:9092 ")
-	brokers, err = getBrokers()
+	app.Config.KafkaBrokers = " localhost:9092 "
+	brokers, err = app.getBrokers()
 	if err != nil {
 		t.Errorf("Expected nil error, but got %v", err)
 	}

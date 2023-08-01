@@ -8,16 +8,24 @@ import (
 	"reflect"
 	"runtime"
 	"syscall"
+	"time"
 
 	gw_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
 	"github.com/ri-nat/foundation/gateway"
 )
 
+const (
+	// GatewayDefaultTimeout is the default timeout for downstream services requests.
+	GatewayDefaultTimeout = 30 * time.Second
+)
+
 // StartGatewayOptions represents the options for starting the Foundation gateway.
 type StartGatewayOptions struct {
 	// Services to register with the gateway
 	Services []gateway.Service
+	// Timeout for downstream services requests
+	Timeout time.Duration
 
 	AuthenticationDetailsMiddleware func(http.Handler) http.Handler
 
@@ -28,12 +36,17 @@ type StartGatewayOptions struct {
 }
 
 func NewStartGatewayOptions() StartGatewayOptions {
-	return StartGatewayOptions{}
+	return StartGatewayOptions{
+		Timeout: GatewayDefaultTimeout,
+	}
 }
 
 // StartGateway starts the Foundation gateway.
 func (app *Application) StartGateway(opts StartGatewayOptions) {
 	app.logStartup("gateway")
+
+	gw_runtime.DefaultContextTimeout = opts.Timeout
+	app.Logger.Debugf("Downstream request timeout: %s", opts.Timeout)
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
@@ -83,44 +96,39 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 }
 
 func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
-	app.Logger.Info("Using middleware (in reverse order):")
+	var middleware []func(http.Handler) http.Handler
 
-	// Custom middleware
-	for i := len(opts.Middleware) - 1; i >= 0; i-- {
-		m := opts.Middleware[i]
-		app.printMiddlewareName(m)
-		mux = m(mux)
+	// General middleware
+	middleware = append(middleware, gateway.WithRequestLogger(app.Logger), gateway.WithCORSEnabled)
+
+	// Authentication details middleware
+	if opts.AuthenticationDetailsMiddleware != nil {
+		middleware = append(middleware, opts.AuthenticationDetailsMiddleware)
 	}
 
 	// Authentication middleware
 	if opts.WithAuthentication {
-		app.printMiddlewareName(gateway.WithAuthentication)
-		mux = gateway.WithAuthentication(mux, opts.AuthenticationExcept)
+		middleware = append(middleware, gateway.WithAuthentication(opts.AuthenticationExcept))
 	}
 
-	// Authentication details middleware
-	if opts.AuthenticationDetailsMiddleware != nil {
-		app.printMiddlewareName(opts.AuthenticationDetailsMiddleware)
-		mux = opts.AuthenticationDetailsMiddleware(mux)
-	}
+	// Custom middleware
+	middleware = append(middleware, opts.Middleware...)
 
-	// General middleware
-	middleware := []func(http.Handler) http.Handler{
-		gateway.WithRequestLogger(app.Logger),
-		gateway.WithCORSEnabled,
-	}
+	// Log middleware chain
+	app.logMiddlewareChain(middleware)
+
+	// Apply middleware in reverse order, so the order they are defined is the order they are applied
 	for i := len(middleware) - 1; i >= 0; i-- {
-		m := middleware[i]
-		app.printMiddlewareName(m)
-		mux = m(mux)
+		mux = middleware[i](mux)
 	}
 
 	return mux
 }
 
-func (app *Application) printMiddlewareName(middleware interface{}) {
-	funcValue := reflect.ValueOf(middleware)
-	funcName := runtime.FuncForPC(funcValue.Pointer()).Name()
+func (app *Application) logMiddlewareChain(middleware []func(http.Handler) http.Handler) {
+	app.Logger.Info("Using middleware:")
 
-	app.Logger.Infof(" - %s", funcName)
+	for _, m := range middleware {
+		app.Logger.Infof(" - %s", runtime.FuncForPC(reflect.ValueOf(m).Pointer()).Name())
+	}
 }
