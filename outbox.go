@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
-	fctx "github.com/ri-nat/foundation/context"
 	"github.com/ri-nat/foundation/outboxrepo"
 	"google.golang.org/protobuf/proto"
+
+	fctx "github.com/ri-nat/foundation/context"
+	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
 var (
@@ -67,8 +69,8 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 		event.Headers = make(map[string]string)
 	}
 
-	event.Headers[KafkaHeaderProtoName] = event.ProtoName
-	event.Headers[KafkaHeaderCorrelationID] = fctx.GetCorrelationID(ctx)
+	event.Headers[fkafka.HeaderProtoName] = event.ProtoName
+	event.Headers[fkafka.HeaderCorrelationID] = fctx.GetCorrelationID(ctx)
 
 	return event
 }
@@ -79,7 +81,7 @@ func (app *Application) publishEventToOutbox(ctx context.Context, event *Event, 
 
 	if tx == nil {
 		// Start transaction
-		tx, err := app.PG.Begin()
+		tx, err := app.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -121,7 +123,7 @@ func (app *Application) publishEventToKafka(ctx context.Context, event *Event) F
 		return NewInternalError(err, "failed to create message from event")
 	}
 	ch := make(chan kafka.Event)
-	if err := app.KafkaProducer.Produce(message, ch); err != nil {
+	if err := app.GetKafkaProducer().Produce(message, ch); err != nil {
 		return NewInternalError(err, "failed to publish event to Kafka")
 	}
 
@@ -161,7 +163,7 @@ func (app *Application) NewAndPublishEvent(ctx context.Context, msg proto.Messag
 // returns an event, it will be published.
 func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, FoundationError)) FoundationError {
 	// Start transaction
-	tx, err := app.PG.Begin()
+	tx, err := app.GetPostgreSQL().Begin()
 	if err != nil {
 		return NewInternalError(err, "failed to begin transaction")
 	}
@@ -190,7 +192,7 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 
 // ListOutboxEvents returns a list of outbox events in the order they were created.
 func (app *Application) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, FoundationError) {
-	queries := outboxrepo.New(app.PG)
+	queries := outboxrepo.New(app.GetPostgreSQL())
 
 	events, err := queries.ListOutboxEvents(ctx, limit)
 	if err != nil {
@@ -202,7 +204,7 @@ func (app *Application) ListOutboxEvents(ctx context.Context, limit int32) ([]ou
 
 // DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
 func (app *Application) DeleteOutboxEvents(ctx context.Context, maxID int64) FoundationError {
-	queries := outboxrepo.New(app.PG)
+	queries := outboxrepo.New(app.GetPostgreSQL())
 
 	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {
 		return NewInternalError(err, "failed to `DeleteOutboxEvents`")

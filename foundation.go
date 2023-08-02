@@ -1,31 +1,23 @@
 package foundation
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
-	"net/http"
-	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/ri-nat/foundation/postgresql"
 	"github.com/sirupsen/logrus"
+
+	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
 const Version = "0.1.0"
 
 // Application represents a Foundation application.
 type Application struct {
-	Name   string
-	Config *Config
-
-	PG *sql.DB
-
-	KafkaConsumer *kafka.Consumer
-	KafkaProducer *kafka.Producer
+	Name       string
+	Config     *Config
+	Components []Component
 
 	Logger *logrus.Entry
-
-	InsightServer *http.Server
 }
 
 type Config struct {
@@ -67,6 +59,60 @@ func Init(name string) *Application {
 // StartComponentsOption is an option to `StartComponents`.
 type StartComponentsOption func(*Application)
 
+// WithKafkaConsumerTopics sets the Kafka consumer topics.
+func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
+	return func(app *Application) {
+		app.Config.KafkaConsumerTopics = topics
+	}
+}
+
+func (app *Application) addSystemComponents() error {
+	// Remove user-defined components in order to add system components first.
+	existedComponents := app.Components
+	app.Components = []Component{}
+
+	// PostgreSQL
+	if app.Config.DatabaseEnabled {
+		app.Components = append(app.Components, postgresql.NewPostgreSQLComponent(
+			postgresql.WithDatabaseURL(app.Config.DatabaseURL),
+			postgresql.WithPoolSize(app.Config.DatabasePool),
+			postgresql.WithLogger(app.Logger),
+		))
+	}
+
+	// Kafka consumer
+	if app.Config.KafkaConsumerEnabled {
+		app.Components = append(app.Components, fkafka.NewConsumerComponent(
+			fkafka.WithConsumerAppName(app.Name),
+			fkafka.WithConsumerBrokers(app.Config.KafkaBrokers),
+			fkafka.WithConsumerTopics(app.Config.KafkaConsumerTopics),
+			fkafka.WithConsumerLogger(app.Logger),
+		))
+	}
+
+	// Kafka producer
+	if app.Config.KafkaProducerEnabled {
+		app.Components = append(app.Components, fkafka.NewProducerComponent(
+			fkafka.WithProducerBrokers(app.Config.KafkaBrokers),
+			fkafka.WithProducerLogger(app.Logger),
+		))
+	}
+
+	// Insight server
+	if app.Config.InsightEnabled {
+		app.Components = append(app.Components, NewInsightServerComponent(
+			WithInsightServerHealthHandler(app.healthHandler),
+			WithInsightServerLogger(app.Logger),
+			WithInsightServerPort(app.Config.InsightPort),
+		))
+	}
+
+	// Add user-defined components back
+	app.Components = append(app.Components, existedComponents...)
+
+	return nil
+}
+
 // StartComponents starts the default Foundation application components.
 func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 	// Apply options
@@ -74,30 +120,18 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 		opt(app)
 	}
 
-	// PostgreSQL
-	if app.Config.DatabaseEnabled {
-		if err := app.connectToPostgreSQL(); err != nil {
-			return fmt.Errorf("postgresql: %w", err)
-		}
+	if err := app.addSystemComponents(); err != nil {
+		return err
 	}
 
-	// Kafka consumer
-	if app.Config.KafkaConsumerEnabled {
-		if err := app.connectKafkaConsumer(); err != nil {
-			return fmt.Errorf("kafka consumer: %w", err)
-		}
-	}
+	app.Logger.Info("Starting components:")
 
-	// Kafka producer
-	if app.Config.KafkaProducerEnabled {
-		if err := app.connectKafkaProducer(); err != nil {
-			return fmt.Errorf("kafka producer: %w", err)
-		}
-	}
+	for _, component := range app.Components {
+		app.Logger.Infof(" - %s", component.Name())
 
-	// Insight server
-	if app.Config.InsightEnabled {
-		app.StartInsightServer()
+		if err := component.Start(); err != nil {
+			return fmt.Errorf("failed to start component `%s`: %w", component.Name(), err)
+		}
 	}
 
 	return nil
@@ -105,28 +139,14 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 
 // StopComponents stops the default Foundation application components.
 func (app *Application) StopComponents() {
-	// PostgreSQL
-	if app.PG != nil {
-		app.PG.Close()
-	}
+	app.Logger.Info("Stopping components:")
 
-	// Kafka consumer
-	if app.KafkaConsumer != nil {
-		app.KafkaConsumer.Close()
-	}
+	// Stop components in reverse order, so that dependencies are stopped first
+	for i := len(app.Components) - 1; i >= 0; i-- {
+		app.Logger.Infof(" - %s", app.Components[i].Name())
 
-	// Kafka producer
-	if app.KafkaProducer != nil {
-		app.KafkaProducer.Close()
-	}
-
-	// Insight
-	if app.InsightServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := app.InsightServer.Shutdown(ctx); err != nil {
-			app.Logger.Errorf("Failed to shut down insight server: %v", err)
+		if err := app.Components[i].Stop(); err != nil {
+			app.Logger.Errorf("failed to stop component `%s`: %s", app.Components[i].Name(), err)
 		}
 	}
 }

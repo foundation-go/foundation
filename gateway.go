@@ -73,12 +73,8 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			if err == http.ErrServerClosed {
-				app.Logger.Println("Server stopped")
-			} else {
-				app.Logger.Fatalf("Failed to start server: %v", err)
-			}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			app.Logger.Fatalf("Failed to start server: %v", err)
 		}
 	}()
 

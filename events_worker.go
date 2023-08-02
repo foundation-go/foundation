@@ -9,6 +9,7 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	fctx "github.com/ri-nat/foundation/context"
+	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
 // EventHandler represents an event handler
@@ -84,7 +85,7 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 		Topic:     *msg.TopicPartition.Topic,
 		Key:       string(msg.Key),
 		Payload:   msg.Value,
-		ProtoName: headers[KafkaHeaderProtoName],
+		ProtoName: headers[fkafka.HeaderProtoName],
 		Headers:   headers,
 		CreatedAt: msg.Timestamp,
 	}
@@ -92,7 +93,7 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 
 func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
 	return func(ctx context.Context) FoundationError {
-		msg, err := app.KafkaConsumer.ReadMessage(-1)
+		msg, err := app.GetKafkaConsumer().ReadMessage(-1)
 		if err != nil {
 			return NewInternalError(err, "failed to read message from Kafka")
 		}
@@ -133,7 +134,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 	)
 
 	if app.Config.DatabaseEnabled {
-		tx, err := app.PG.Begin()
+		tx, err := app.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -145,7 +146,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 	}
 
 	// Add correlation ID to context
-	ctx = fctx.SetCorrelationID(ctx, event.Headers[KafkaHeaderCorrelationID])
+	ctx = fctx.SetCorrelationID(ctx, event.Headers[fkafka.HeaderCorrelationID])
 
 	// Handle event
 	events, handleErr := handler.Handle(ctx, event)
@@ -178,7 +179,7 @@ func (app *Application) CommitMessage(msg *kafka.Message) FoundationError {
 
 	// TODO: Make something clever here
 	for i := 0; i < 3; i++ {
-		if _, err = app.KafkaConsumer.CommitMessage(msg); err != nil {
+		if _, err = app.GetKafkaConsumer().CommitMessage(msg); err != nil {
 			if i < 2 {
 				time.Sleep(1 * time.Second)
 				continue

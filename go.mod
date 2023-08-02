@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/confluentinc/confluent-kafka-go/v2 v2.2.0
+	github.com/gogo/protobuf v1.3.2
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.2

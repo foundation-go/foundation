@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	fkafka "github.com/ri-nat/foundation/kafka"
+	fpg "github.com/ri-nat/foundation/postgresql"
 )
 
 func TestHealthHandler(t *testing.T) {
@@ -33,14 +36,14 @@ func TestHealthHandler(t *testing.T) {
 	assertExample(app, http.StatusOK)
 
 	// When database is enabled, but not connected
-	app.Config = &Config{DatabaseEnabled: true}
+	app.Components = append(app.Components, &fpg.PostgreSQLComponent{})
 	assertExample(app, http.StatusInternalServerError)
 
 	// When Kafka consumer is enabled, but not connected
-	app.Config = &Config{KafkaConsumerEnabled: true}
+	app.Components = []Component{&fkafka.ConsumerComponent{}}
 	assertExample(app, http.StatusInternalServerError)
 
 	// When Kafka producer is enabled, but not connected
-	app.Config = &Config{KafkaProducerEnabled: true}
+	app.Components = []Component{&fkafka.ProducerComponent{}}
 	assertExample(app, http.StatusInternalServerError)
 }

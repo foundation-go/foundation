@@ -9,14 +9,14 @@ func TestGetBrokers(t *testing.T) {
 
 	// Test case 1: KAFKA_BROKERS is not set
 	app.Config.KafkaBrokers = ""
-	_, err := app.getBrokers()
+	_, err := app.getKafkaBrokers()
 	if err == nil {
 		t.Errorf("Expected error, but got nil")
 	}
 
 	// Test case 2: KAFKA_BROKERS is set with one broker
 	app.Config.KafkaBrokers = "localhost:9092"
-	brokers, err := app.getBrokers()
+	brokers, err := app.getKafkaBrokers()
 	if err != nil {
 		t.Errorf("Expected nil error, but got %v", err)
 	}
@@ -26,7 +26,7 @@ func TestGetBrokers(t *testing.T) {
 
 	// Test case 3: KAFKA_BROKERS is set with space on both sides
 	app.Config.KafkaBrokers = " localhost:9092 "
-	brokers, err = app.getBrokers()
+	brokers, err = app.getKafkaBrokers()
 	if err != nil {
 		t.Errorf("Expected nil error, but got %v", err)
 	}

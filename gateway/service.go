@@ -23,6 +23,8 @@ type Service struct {
 
 func RegisterServices(services []Service, muxOpts ...runtime.ServeMuxOption) (http.Handler, error) {
 	ctx := context.Background()
+
+	muxOpts = append(muxOpts, runtime.WithErrorHandler(ErrorHandler))
 	mux := runtime.NewServeMux(muxOpts...)
 
 	// Define gRPC connection options
