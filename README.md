@@ -22,13 +22,13 @@ Foundation is built upon several proven technologies including:
 
 ## Key Features
 
-- [x] **Unified Logging**: Conveniently log with colors during development and structured logging in production using `logrus`.
-- [x] **Metrics**: Collect and expose application metrics to Prometheus.
-- [x] **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
-- [x] **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
-- [x] **Health Check**: Provide Kubernetes with health status of your application.
 - [x] **Running Modes**: Choose the mode that best fits your needs: `gateway`, `grpc`, `http`, `worker`, `events_worker`, or `job`.
+- [x] **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
+- [x] **Unified Logging**: Conveniently log with colors during development and structured logging in production using `logrus`.
 - [ ] **Tracing**: Trace and log your requests in a structured format with OpenTracing.
+- [x] **Metrics**: Collect and expose application metrics to Prometheus.
+- [x] **Health Check**: Provide Kubernetes with health status of your application.
+- [x] **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
 - [ ] **Helpers**: A variety of helpers for common tasks.
 
 ## Integrations
@@ -40,7 +40,7 @@ Foundation comes with built-in support for:
 - [x] **ORY Hydra**: Authenticate users on a gateway with ORY Hydra.
 - [x] **gRPC Gateway**: Expose gRPC services as JSON endpoints.
 - [x] **Kafka**: Produce and consume messages with Kafka (via `confluent-kafka-go`).
-- [ ] **Sentry**: Report errors to Sentry.
+- [x] **Sentry**: Report errors to Sentry.
 
 ## Getting Started
 

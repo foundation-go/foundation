@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/getsentry/sentry-go"
 	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
@@ -33,12 +34,16 @@ func NewMessageFromEvent(event *Event) (*kafka.Message, error) {
 func (app *Application) GetKafkaConsumer() *kafka.Consumer {
 	component := app.GetComponent(fkafka.ConsumerComponentName)
 	if component == nil {
-		app.Logger.Fatal("Kafka consumer component is not registered")
+		err := errors.New("kafka consumer component is not registered")
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	consumer, ok := component.(*fkafka.ConsumerComponent)
 	if !ok {
-		app.Logger.Fatal("Kafka consumer component is not of type *fkafka.ConsumerComponent")
+		err := errors.New("kafka consumer component is not of type *fkafka.ConsumerComponent")
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	return consumer.Consumer
@@ -47,12 +52,16 @@ func (app *Application) GetKafkaConsumer() *kafka.Consumer {
 func (app *Application) GetKafkaProducer() *kafka.Producer {
 	component := app.GetComponent(fkafka.ProducerComponentName)
 	if component == nil {
-		app.Logger.Fatal("Kafka producer component is not registered")
+		err := errors.New("kafka producer component is not registered")
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	producer, ok := component.(*fkafka.ProducerComponent)
 	if !ok {
-		app.Logger.Fatal("Kafka producer component is not of type *fkafka.ProducerComponent")
+		err := errors.New("kafka producer component is not of type *fkafka.ProducerComponent")
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	return producer.Producer

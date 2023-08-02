@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -65,7 +66,9 @@ func (c *InsightServerComponent) Start() error {
 
 	go func() {
 		if err := c.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			c.logger.Fatalf("Failed to start insight HTTP server: %v", err)
+			err = fmt.Errorf("failed to start insight HTTP server: %w", err)
+			sentry.CaptureException(err)
+			c.logger.Fatal(err)
 		}
 	}()
 
@@ -74,8 +77,6 @@ func (c *InsightServerComponent) Start() error {
 
 // Stop implements the Component interface.
 func (c *InsightServerComponent) Stop() error {
-	c.logger.Info("Stopping insight HTTP server...")
-
 	return c.server.Close()
 }
 

@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/getsentry/sentry-go"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	fg "github.com/ri-nat/foundation/grpc"
 	"google.golang.org/grpc"
@@ -31,6 +32,8 @@ func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
 		app.Logger.Fatalf("Failed to start components: %v", err)
 	}
 
@@ -56,7 +59,9 @@ func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			app.Logger.Fatalf("Failed to start server: %v", err)
+			err = fmt.Errorf("failed to start server: %w", err)
+			sentry.CaptureException(err)
+			app.Logger.Fatal(err)
 		}
 	}()
 
@@ -67,14 +72,16 @@ func (app *Application) StartGRPCServer(opts StartGRPCServerOptions) {
 	server.GracefulStop()
 	app.StopComponents()
 
-	app.Logger.Println("Server gracefully stopped")
+	app.Logger.Println("Application gracefully stopped")
 }
 
 func (app *Application) aquireListener() net.Listener {
 	port := GetEnvOrInt("PORT", 51051)
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
-		app.Logger.Fatalf("Failed to listen port %d: %v", port, err)
+		err = fmt.Errorf("failed to listen port %d: %w", port, err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)

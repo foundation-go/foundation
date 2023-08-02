@@ -3,10 +3,12 @@ package foundation
 import (
 	"fmt"
 
-	"github.com/ri-nat/foundation/postgresql"
+	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
 	fkafka "github.com/ri-nat/foundation/kafka"
+	fpg "github.com/ri-nat/foundation/postgresql"
+	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
 const Version = "0.1.0"
@@ -24,12 +26,14 @@ type Config struct {
 	DatabaseEnabled      bool
 	DatabasePool         int
 	DatabaseURL          string
+	InsightEnabled       bool
+	InsightPort          int
 	KafkaBrokers         string
 	KafkaConsumerEnabled bool
 	KafkaConsumerTopics  []string
 	KafkaProducerEnabled bool
-	InsightEnabled       bool
-	InsightPort          int
+	SentryDSN            string
+	SentryEnabled        bool
 }
 
 // NewConfig returns a new Config with values populated from environment variables.
@@ -38,12 +42,14 @@ func NewConfig() *Config {
 		DatabaseEnabled:      len(GetEnvOrString("DATABASE_URL", "")) > 0,
 		DatabasePool:         GetEnvOrInt("DATABASE_POOL", 5),
 		DatabaseURL:          GetEnvOrString("DATABASE_URL", ""),
+		InsightEnabled:       GetEnvOrBool("INSIGHT_ENABLED", true),
+		InsightPort:          GetEnvOrInt("INSIGHT_PORT", 51077),
 		KafkaBrokers:         GetEnvOrString("KAFKA_BROKERS", ""),
 		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
 		KafkaConsumerTopics:  nil,
 		KafkaProducerEnabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
-		InsightEnabled:       GetEnvOrBool("INSIGHT_ENABLED", true),
-		InsightPort:          GetEnvOrInt("INSIGHT_PORT", 51077),
+		SentryDSN:            GetEnvOrString("SENTRY_DSN", ""),
+		SentryEnabled:        len(GetEnvOrString("SENTRY_DSN", "")) > 0,
 	}
 }
 
@@ -71,12 +77,17 @@ func (app *Application) addSystemComponents() error {
 	existedComponents := app.Components
 	app.Components = []Component{}
 
+	// Sentry
+	if app.Config.SentryEnabled {
+		app.Components = append(app.Components, fsentry.NewComponent(app.Config.SentryDSN))
+	}
+
 	// PostgreSQL
 	if app.Config.DatabaseEnabled {
-		app.Components = append(app.Components, postgresql.NewPostgreSQLComponent(
-			postgresql.WithDatabaseURL(app.Config.DatabaseURL),
-			postgresql.WithPoolSize(app.Config.DatabasePool),
-			postgresql.WithLogger(app.Logger),
+		app.Components = append(app.Components, fpg.NewPostgreSQLComponent(
+			fpg.WithDatabaseURL(app.Config.DatabaseURL),
+			fpg.WithPoolSize(app.Config.DatabasePool),
+			fpg.WithLogger(app.Logger),
 		))
 	}
 
@@ -130,7 +141,7 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 		app.Logger.Infof(" - %s", component.Name())
 
 		if err := component.Start(); err != nil {
-			return fmt.Errorf("failed to start component `%s`: %w", component.Name(), err)
+			return fmt.Errorf("%s: %w", component.Name(), err)
 		}
 	}
 
@@ -146,7 +157,9 @@ func (app *Application) StopComponents() {
 		app.Logger.Infof(" - %s", app.Components[i].Name())
 
 		if err := app.Components[i].Stop(); err != nil {
-			app.Logger.Errorf("failed to stop component `%s`: %s", app.Components[i].Name(), err)
+			err = fmt.Errorf("failed to stop component `%s`: %w", app.Components[i].Name(), err)
+			sentry.CaptureException(err)
+			app.Logger.Error(err)
 		}
 	}
 }

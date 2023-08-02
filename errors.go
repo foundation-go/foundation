@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
@@ -78,7 +79,7 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 
 	st, err := st.WithDetails(badRequest)
 	if err != nil {
-		// TODO: maybe `fatal` here?
+		sentry.CaptureException(err)
 		return status.New(codes.Internal, "internal error")
 	}
 
@@ -229,7 +230,7 @@ func (app *Application) foundationErrorToStatusInterceptor(ctx context.Context, 
 func (app *Application) ProcessError(err FoundationError) {
 	// Log internal errors
 	if _, ok := err.(*InternalError); ok {
-		// TODO: log error to Sentry
 		app.Logger.Error(err.Error())
+		sentry.CaptureException(err)
 	}
 }

@@ -2,9 +2,12 @@ package foundation
 
 import (
 	"context"
+	"fmt"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // StartWorkerOptions are the options to start a Foundation application in worker mode.
@@ -36,7 +39,9 @@ func (app *Application) StartWorker(opts StartWorkerOptions) {
 
 	// Start common components
 	if err := app.StartComponents(opts.StartComponentsOptions...); err != nil {
-		app.Logger.Fatalf("Failed to start components: %v", err)
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -66,5 +71,5 @@ Loop:
 
 	app.StopComponents()
 
-	app.Logger.Infof("%s gracefully stopped", opts.ModeName)
+	app.Logger.Println("Application gracefully stopped")
 }

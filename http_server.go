@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+
+	"github.com/getsentry/sentry-go"
 )
 
 // StartHTTPServerOptions are the options to start a Foundation application in server mode.
@@ -24,7 +26,9 @@ func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		app.Logger.Fatalf("Failed to start components: %v", err)
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -39,12 +43,10 @@ func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil {
-			if err == http.ErrServerClosed {
-				app.Logger.Println("Server stopped")
-			} else {
-				app.Logger.Fatalf("Failed to start server: %v", err)
-			}
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			err = fmt.Errorf("failed to start server: %w", err)
+			sentry.CaptureException(err)
+			app.Logger.Fatal(err)
 		}
 	}()
 
@@ -53,10 +55,12 @@ func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 
 	// Gracefully stop the server
 	if err := server.Shutdown(context.Background()); err != nil {
-		app.Logger.Fatalf("Failed to gracefully shutdown server: %v", err)
+		err = fmt.Errorf("failed to gracefully shutdown server: %w", err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	app.StopComponents()
 
-	app.Logger.Println("Server gracefully stopped")
+	app.Logger.Println("Application gracefully stopped")
 }

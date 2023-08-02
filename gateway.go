@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
 	gw_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
 	"github.com/ri-nat/foundation/gateway"
@@ -50,7 +51,9 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
-		app.Logger.Fatalf("Failed to start components: %v", err)
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	mux, err := gateway.RegisterServices(
@@ -58,6 +61,7 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 		gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
 	)
 	if err != nil {
+		sentry.CaptureException(err)
 		app.Logger.Fatal(err)
 	}
 
@@ -74,7 +78,9 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			app.Logger.Fatalf("Failed to start server: %v", err)
+			err = fmt.Errorf("failed to start server: %w", err)
+			sentry.CaptureException(err)
+			app.Logger.Fatal(err)
 		}
 	}()
 
@@ -83,12 +89,14 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 
 	// Gracefully stop the server
 	if err := server.Shutdown(context.Background()); err != nil {
-		app.Logger.Fatalf("Failed to gracefully shutdown server: %v", err)
+		err = fmt.Errorf("failed to gracefully shutdown server: %w", err)
+		sentry.CaptureException(err)
+		app.Logger.Fatal(err)
 	}
 
 	app.StopComponents()
 
-	app.Logger.Println("Server gracefully stopped")
+	app.Logger.Println("Application gracefully stopped")
 }
 
 func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
