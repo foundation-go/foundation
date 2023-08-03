@@ -39,7 +39,7 @@ Foundation comes with built-in support for:
 - [x] **Dotenv**: Load environment variables from .env files.
 - [x] **ORY Hydra**: Authenticate users on a gateway with ORY Hydra.
 - [x] **gRPC Gateway**: Expose gRPC services as JSON endpoints.
-- [x] **Kafka**: Produce and consume messages with Kafka (via `confluent-kafka-go`).
+- [x] **Kafka**: Produce and consume messages with Kafka (via `kafka-go`).
 - [x] **Sentry**: Report errors to Sentry.
 
 ## Getting Started

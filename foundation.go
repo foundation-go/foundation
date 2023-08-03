@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ type Config struct {
 	DatabaseURL          string
 	InsightEnabled       bool
 	InsightPort          int
-	KafkaBrokers         string
+	KafkaBrokers         []string
 	KafkaConsumerEnabled bool
 	KafkaConsumerTopics  []string
 	KafkaProducerEnabled bool
@@ -44,7 +45,7 @@ func NewConfig() *Config {
 		DatabaseURL:          GetEnvOrString("DATABASE_URL", ""),
 		InsightEnabled:       GetEnvOrBool("INSIGHT_ENABLED", true),
 		InsightPort:          GetEnvOrInt("INSIGHT_PORT", 51077),
-		KafkaBrokers:         GetEnvOrString("KAFKA_BROKERS", ""),
+		KafkaBrokers:         strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
 		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
 		KafkaConsumerTopics:  nil,
 		KafkaProducerEnabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),

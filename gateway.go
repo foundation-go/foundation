@@ -47,12 +47,13 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 	app.logStartup("gateway")
 
 	gw_runtime.DefaultContextTimeout = opts.Timeout
-	app.Logger.Debugf("Downstream request timeout: %s", opts.Timeout)
+	app.Logger.Debugf("Downstream requests timeout: %s", opts.Timeout)
 
 	// Start common components
 	if err := app.StartComponents(); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
+		// TODO: Maybe flush sentry before exiting via Fatal?
 		app.Logger.Fatal(err)
 	}
 

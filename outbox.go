@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/ri-nat/foundation/outboxrepo"
 	"google.golang.org/protobuf/proto"
 
@@ -122,16 +121,9 @@ func (app *Application) publishEventToKafka(ctx context.Context, event *Event) F
 	if err != nil {
 		return NewInternalError(err, "failed to create message from event")
 	}
-	ch := make(chan kafka.Event)
-	if err := app.GetKafkaProducer().Produce(message, ch); err != nil {
-		return NewInternalError(err, "failed to publish event to Kafka")
-	}
 
-	// Wait for delivery report
-	e := <-ch
-	m := e.(*kafka.Message)
-	if m.TopicPartition.Error != nil {
-		return NewInternalError(m.TopicPartition.Error, "failed to publish event to Kafka")
+	if err := app.GetKafkaProducer().WriteMessages(ctx, *message); err != nil {
+		return NewInternalError(err, "failed to publish event to Kafka")
 	}
 
 	return nil

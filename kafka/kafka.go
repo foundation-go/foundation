@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
+	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,15 +20,11 @@ const (
 	ProducerComponentName = "kafka-producer"
 )
 
-const (
-	healthCheckTimeout = 1 * time.Second
-)
-
 type ConsumerComponent struct {
-	Consumer *kafka.Consumer
+	Consumer *kafka.Reader
 
 	appName string
-	brokers string
+	brokers []string
 	logger  *logrus.Entry
 	topics  []string
 }
@@ -44,7 +40,7 @@ func WithConsumerAppName(appName string) ConsumerComponentOption {
 }
 
 // WithConsumerBrokers sets the brokers for the ConsumerComponent
-func WithConsumerBrokers(brokers string) ConsumerComponentOption {
+func WithConsumerBrokers(brokers []string) ConsumerComponentOption {
 	return func(c *ConsumerComponent) {
 		c.brokers = brokers
 	}
@@ -53,7 +49,7 @@ func WithConsumerBrokers(brokers string) ConsumerComponentOption {
 // WithConsumerLogger sets the logger for the ConsumerComponent
 func WithConsumerLogger(logger *logrus.Entry) ConsumerComponentOption {
 	return func(c *ConsumerComponent) {
-		c.logger = logger
+		c.logger = logger.WithField("component", ConsumerComponentName)
 	}
 }
 
@@ -80,22 +76,14 @@ func (c *ConsumerComponent) Start() error {
 	if len(c.topics) == 0 {
 		return errors.New("you must specify topics during the application initialization using the `WithKafkaConsumerTopics`")
 	}
-
-	consumer, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers":  c.brokers,
-		"group.id":           fmt.Sprintf("%s-consumer", c.appName),
-		"auto.offset.reset":  "earliest",
-		"enable.auto.commit": false,
-	})
-	if err != nil {
-		return err
-	}
-
 	c.logger.Debugf("Kafka consumer topics: %v", c.topics)
 
-	if err = consumer.SubscribeTopics(c.topics, nil); err != nil {
-		return err
-	}
+	consumer := kafka.NewReader(kafka.ReaderConfig{
+		Brokers:     c.brokers,
+		GroupID:     fmt.Sprintf("%s-consumer", c.appName),
+		GroupTopics: c.topics,
+		Logger:      c.logger,
+	})
 
 	c.Consumer = consumer
 
@@ -110,12 +98,10 @@ func (c *ConsumerComponent) Stop() error {
 // Health implements the Component interface.
 func (c *ConsumerComponent) Health() error {
 	if c.Consumer == nil {
-		return errors.New("consumer is not initialized")
+		return errors.New("reader is not initialized")
 	}
 
-	if _, err := c.Consumer.GetMetadata(nil, true, 1000); err != nil {
-		return err
-	}
+	// TODO: find a way to check the health of the consumer. Maybe by adding the metadata fet
 
 	return nil
 }
@@ -127,9 +113,9 @@ func (c *ConsumerComponent) Name() string {
 
 // ProducerComponent represents a Kafka producer component
 type ProducerComponent struct {
-	Producer *kafka.Producer
+	Producer *kafka.Writer
 
-	brokers string
+	brokers []string
 	logger  *logrus.Entry
 }
 
@@ -137,7 +123,7 @@ type ProducerComponent struct {
 type ProducerComponentOption func(*ProducerComponent)
 
 // WithProducerBrokers sets the brokers for the ProducerComponent
-func WithProducerBrokers(brokers string) ProducerComponentOption {
+func WithProducerBrokers(brokers []string) ProducerComponentOption {
 	return func(c *ProducerComponent) {
 		c.brokers = brokers
 	}
@@ -163,14 +149,12 @@ func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 
 // Start implements the Component interface.
 func (c *ProducerComponent) Start() error {
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": c.brokers})
-	if err != nil {
-		return err
-	}
-
-	// Test the connection
-	if _, err = producer.GetMetadata(nil, true, int(healthCheckTimeout.Milliseconds())); err != nil {
-		return err
+	producer := &kafka.Writer{
+		Addr:                   kafka.TCP(c.brokers...),
+		AllowAutoTopicCreation: true,
+		BatchSize:              1,               // TODO: make this configurable
+		BatchTimeout:           1 * time.Second, // TODO: make this configurable
+		Logger:                 c.logger,
 	}
 
 	c.Producer = producer
@@ -188,11 +172,7 @@ func (c *ProducerComponent) Stop() error {
 // Health implements the Component interface.
 func (c *ProducerComponent) Health() error {
 	if c.Producer == nil {
-		return errors.New("producer is not initialized")
-	}
-
-	if _, err := c.Producer.GetMetadata(nil, true, int(healthCheckTimeout.Milliseconds())); err != nil {
-		return err
+		return errors.New("writer is not initialized")
 	}
 
 	return nil

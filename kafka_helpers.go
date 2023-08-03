@@ -2,20 +2,16 @@ package foundation
 
 import (
 	"errors"
-	"strings"
 
-	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"github.com/getsentry/sentry-go"
 	fkafka "github.com/ri-nat/foundation/kafka"
+	"github.com/segmentio/kafka-go"
 )
 
 // NewMessageFromEvent creates a new Kafka message from a Foundation Outbox event
 func NewMessageFromEvent(event *Event) (*kafka.Message, error) {
 	message := &kafka.Message{
-		TopicPartition: kafka.TopicPartition{
-			Topic:     &event.Topic,
-			Partition: kafka.PartitionAny,
-		},
+		Topic:   event.Topic,
 		Value:   event.Payload,
 		Key:     []byte(event.Key),
 		Headers: []kafka.Header{},
@@ -31,7 +27,7 @@ func NewMessageFromEvent(event *Event) (*kafka.Message, error) {
 	return message, nil
 }
 
-func (app *Application) GetKafkaConsumer() *kafka.Consumer {
+func (app *Application) GetKafkaConsumer() *kafka.Reader {
 	component := app.GetComponent(fkafka.ConsumerComponentName)
 	if component == nil {
 		err := errors.New("kafka consumer component is not registered")
@@ -49,7 +45,7 @@ func (app *Application) GetKafkaConsumer() *kafka.Consumer {
 	return consumer.Consumer
 }
 
-func (app *Application) GetKafkaProducer() *kafka.Producer {
+func (app *Application) GetKafkaProducer() *kafka.Writer {
 	component := app.GetComponent(fkafka.ProducerComponentName)
 	if component == nil {
 		err := errors.New("kafka producer component is not registered")
@@ -67,10 +63,10 @@ func (app *Application) GetKafkaProducer() *kafka.Producer {
 	return producer.Producer
 }
 
-func (app *Application) getKafkaBrokers() (string, error) {
-	if app.Config.KafkaBrokers == "" {
-		return "", errors.New("KAFKA_BROKERS variable is not set")
+func (app *Application) getKafkaBrokers() ([]string, error) {
+	if len(app.Config.KafkaBrokers) == 0 {
+		return nil, errors.New("KAFKA_BROKERS variable is not set")
 	}
 
-	return strings.TrimSpace(app.Config.KafkaBrokers), nil
+	return app.Config.KafkaBrokers, nil
 }

@@ -30,6 +30,7 @@ type StartWorkerOptions struct {
 func NewStartWorkerOptions() StartWorkerOptions {
 	return StartWorkerOptions{
 		ModeName: "worker",
+		Interval: 5 * time.Millisecond,
 	}
 }
 
