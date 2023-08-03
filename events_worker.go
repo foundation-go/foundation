@@ -141,10 +141,11 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 	var (
 		tx         *sql.Tx
 		needCommit bool
+		err        error
 	)
 
 	if app.Config.DatabaseEnabled {
-		tx, err := app.GetPostgreSQL().Begin()
+		tx, err = app.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -173,7 +174,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 
 	if needCommit {
 		// Commit transaction
-		if err := tx.Commit(); err != nil {
+		if err = tx.Commit(); err != nil {
 			return NewInternalError(err, "failed to commit transaction")
 		}
 	}
