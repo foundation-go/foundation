@@ -13,27 +13,27 @@ type Env string
 const (
 	EnvDevelopment Env = "development"
 	EnvProduction  Env = "production"
+	EnvTest        Env = "test"
 )
 
-// AppEnv returns the application environment name.
-func AppEnv() Env {
-	appEnv := Env(GetEnvOrString("APP_ENV", string(EnvDevelopment)))
-
-	if appEnv != EnvProduction {
-		appEnv = EnvDevelopment
-	}
-
-	return appEnv
+// FoundationEnv returns the application environment name.
+func FoundationEnv() Env {
+	return Env(GetEnvOrString("FOUNDATION_ENV", string(EnvDevelopment)))
 }
 
 // IsProductionEnv returns true if the application is running in production mode.
 func IsProductionEnv() bool {
-	return AppEnv() == EnvProduction
+	return FoundationEnv() == EnvProduction
 }
 
 // IsDevelopmentEnv returns true if the application is running in development mode.
 func IsDevelopmentEnv() bool {
-	return AppEnv() == EnvDevelopment
+	return FoundationEnv() == EnvDevelopment
+}
+
+// IsTestEnv returns true if the application is running in test mode.
+func IsTestEnv() bool {
+	return FoundationEnv() == EnvTest
 }
 
 // GetEnvOrBool returns the value of the environment variable named by the key

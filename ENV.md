@@ -4,7 +4,7 @@
 
 The following environment variables are available for all running modes.
 
-- `APP_ENV`: Application environment. Default: `development`. Possible values: `development`, `production`.
+- `FOUNDATION_ENV`: Application environment. Default: `development`. Possible values: `development`, `production`, `test`.
 - `LOG_LEVEL`: Log level. Default: `INFO`.
 - `PORT`: Port to listen on. Default: `51051`.
 
@@ -20,10 +20,10 @@ The following environment variables are only applicable when running in `gateway
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service.
 
-## Insight
+## Metrics
 
-- `INSIGHT_ENABLED`: Whether to enable the server with `/health` and `/metrics`. Default: `true`.
-- `INSIGHT_PORT`: Port to expose health check on. Default: `51077`.
+- `METRICS_ENABLED`: Whether to enable the server with `/health` and `/metrics`. Default: `true`.
+- `METRICS_PORT`: Port to expose metrics server on. Default: `51077`.
 
 ## Kafka
 

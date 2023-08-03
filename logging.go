@@ -9,7 +9,7 @@ import (
 func initLogger(appName string) *log.Entry {
 	logger := log.New()
 
-	switch AppEnv() {
+	switch FoundationEnv() {
 	case EnvProduction:
 		logger.SetFormatter(&log.JSONFormatter{})
 	default:
@@ -31,6 +31,6 @@ func initLogger(appName string) *log.Entry {
 func (app *Application) logStartup(mode string) {
 	app.Logger.Infof("Starting application")
 	app.Logger.Infof(" - Mode:        %s", mode)
-	app.Logger.Infof(" - Environment: %s", AppEnv())
+	app.Logger.Infof(" - Environment: %s", FoundationEnv())
 	app.Logger.Infof(" - Foundation:  v%s", Version)
 }

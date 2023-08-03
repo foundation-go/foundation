@@ -58,8 +58,6 @@ func NewPostgreSQLComponent(opts ...PostgreSQLComponentOption) *PostgreSQLCompon
 
 // Start implements the Component interface.
 func (c *PostgreSQLComponent) Start() error {
-	c.logger.Info("Connecting to PostgreSQL...")
-
 	connConfig, err := pgx.ParseConfig(c.databaseURL)
 	c.logger.Debugf("PostgreSQL connection config: %+v", connConfig)
 	if err != nil {

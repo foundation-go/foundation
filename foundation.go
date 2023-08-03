@@ -27,8 +27,8 @@ type Config struct {
 	DatabaseEnabled      bool
 	DatabasePool         int
 	DatabaseURL          string
-	InsightEnabled       bool
-	InsightPort          int
+	MetricsEnabled       bool
+	MetricsPort          int
 	KafkaBrokers         []string
 	KafkaConsumerEnabled bool
 	KafkaConsumerTopics  []string
@@ -43,8 +43,8 @@ func NewConfig() *Config {
 		DatabaseEnabled:      len(GetEnvOrString("DATABASE_URL", "")) > 0,
 		DatabasePool:         GetEnvOrInt("DATABASE_POOL", 5),
 		DatabaseURL:          GetEnvOrString("DATABASE_URL", ""),
-		InsightEnabled:       GetEnvOrBool("INSIGHT_ENABLED", true),
-		InsightPort:          GetEnvOrInt("INSIGHT_PORT", 51077),
+		MetricsEnabled:       GetEnvOrBool("METRICS_ENABLED", true),
+		MetricsPort:          GetEnvOrInt("METRICS_PORT", 51077),
 		KafkaBrokers:         strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
 		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
 		KafkaConsumerTopics:  nil,
@@ -110,12 +110,12 @@ func (app *Application) addSystemComponents() error {
 		))
 	}
 
-	// Insight server
-	if app.Config.InsightEnabled {
-		app.Components = append(app.Components, NewInsightServerComponent(
-			WithInsightServerHealthHandler(app.healthHandler),
-			WithInsightServerLogger(app.Logger),
-			WithInsightServerPort(app.Config.InsightPort),
+	// Metrics server
+	if app.Config.MetricsEnabled {
+		app.Components = append(app.Components, NewMetricsServerComponent(
+			WithMetricsServerHealthHandler(app.healthHandler),
+			WithMetricsServerLogger(app.Logger),
+			WithMetricsServerPort(app.Config.MetricsPort),
 		))
 	}
 

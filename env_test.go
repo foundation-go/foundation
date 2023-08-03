@@ -5,38 +5,31 @@ import (
 	"testing"
 )
 
-func TestAppEnv(t *testing.T) {
+func TestFoundationEnv(t *testing.T) {
 	// Test that the default environment is development
-	env := AppEnv()
+	env := FoundationEnv()
 	if env != EnvDevelopment {
 		t.Errorf("Expected default environment to be %s, but got %s", EnvDevelopment, env)
 	}
 
-	// Test that the environment can be set via the APP_ENV environment variable
-	os.Setenv("APP_ENV", "production")
-	env = AppEnv()
+	// Test that the environment can be set via the FOUNDATION_ENV environment variable
+	os.Setenv("FOUNDATION_ENV", "production")
+	env = FoundationEnv()
 	if env != EnvProduction {
 		t.Errorf("Expected environment to be %s, but got %s", EnvProduction, env)
-	}
-
-	// Test that the environment is forced to development if not production
-	os.Setenv("APP_ENV", "test")
-	env = AppEnv()
-	if env != EnvDevelopment {
-		t.Errorf("Expected environment to be %s, but got %s", EnvDevelopment, env)
 	}
 }
 
 func TestIsProductionEnv(t *testing.T) {
 	// Test that the function returns false if the environment is not production
-	os.Setenv("APP_ENV", "development")
+	os.Setenv("FOUNDATION_ENV", "development")
 	isProduction := IsProductionEnv()
 	if isProduction {
 		t.Errorf("Expected IsProductionEnv() to return false, but got true")
 	}
 
 	// Test that the function returns true if the environment is production
-	os.Setenv("APP_ENV", "production")
+	os.Setenv("FOUNDATION_ENV", "production")
 	isProduction = IsProductionEnv()
 	if !isProduction {
 		t.Errorf("Expected IsProductionEnv() to return true, but got false")
@@ -45,14 +38,14 @@ func TestIsProductionEnv(t *testing.T) {
 
 func TestIsDevelopmentEnv(t *testing.T) {
 	// Test that the function returns false if the environment is not development
-	os.Setenv("APP_ENV", "production")
+	os.Setenv("FOUNDATION_ENV", "production")
 	isDevelopment := IsDevelopmentEnv()
 	if isDevelopment {
 		t.Errorf("Expected IsDevelopmentEnv() to return false, but got true")
 	}
 
 	// Test that the function returns true if the environment is development
-	os.Setenv("APP_ENV", "development")
+	os.Setenv("FOUNDATION_ENV", "development")
 	isDevelopment = IsDevelopmentEnv()
 	if !isDevelopment {
 		t.Errorf("Expected IsDevelopmentEnv() to return true, but got false")

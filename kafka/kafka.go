@@ -80,9 +80,9 @@ func (c *ConsumerComponent) Start() error {
 
 	consumer := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:     c.brokers,
-		GroupID:     fmt.Sprintf("%s-consumer", c.appName),
+		GroupID:     fmt.Sprintf("%s-foundation", c.appName),
 		GroupTopics: c.topics,
-		Logger:      c.logger,
+		ErrorLogger: c.logger,
 	})
 
 	c.Consumer = consumer

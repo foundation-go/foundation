@@ -45,28 +45,33 @@ func (app *Application) StartWorker(opts StartWorkerOptions) {
 		app.Logger.Fatal(err)
 	}
 
+	// Watch for termination signals
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	// Run the iteration function in a loop until the application is stopped
-Loop:
-	for {
-		select {
-		case <-ctx.Done():
-			break Loop
-		default:
-			started := time.Now()
+	go func() {
+	Loop:
+		for {
+			select {
+			case <-ctx.Done():
+				break Loop
+			default:
+				started := time.Now()
 
-			if err := opts.ProcessFunc(ctx); err != nil {
-				app.ProcessError(err)
-			}
+				if err := opts.ProcessFunc(ctx); err != nil {
+					app.HandleError(err, "failed to process iteration")
+				}
 
-			// Sleep for the remaining time of the interval
-			if opts.Interval > 0 {
-				time.Sleep(opts.Interval - time.Since(started))
+				// Sleep for the remaining time of the interval
+				if opts.Interval > 0 {
+					time.Sleep(opts.Interval - time.Since(started))
+				}
 			}
 		}
-	}
+	}()
+
+	<-ctx.Done()
 
 	app.Logger.Infof("Shutting down %s...", opts.ModeName)
 

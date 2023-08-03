@@ -3,7 +3,7 @@ package foundation
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -94,17 +94,8 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 
 func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
 	return func(ctx context.Context) FoundationError {
-		// Create 100ms timeout context for reading messages from Kafka
-		tCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-		defer cancel()
-
-		msg, err := app.GetKafkaConsumer().FetchMessage(tCtx)
+		msg, err := app.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				// No messages in Kafka, just return
-				return nil
-			}
-
 			return NewInternalError(err, "failed to read message from Kafka")
 		}
 
@@ -112,9 +103,17 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 
 		var handleErr FoundationError
 
-		for _, handler := range handlers[event.ProtoName] {
-			handleErr = app.processEvent(ctx, handler, event)
+		log := app.Logger.WithFields(map[string]interface{}{
+			"correlation_id": event.Headers[fkafka.HeaderCorrelationID],
+			"event":          event.ProtoName,
+		})
+		log.Info("Received event")
 
+		for _, handler := range handlers[event.ProtoName] {
+			log := log.WithField("handler", fmt.Sprintf("%T", handler))
+			log.Info("Processing event")
+
+			handleErr = app.processEvent(ctx, handler, event)
 			if handleErr != nil {
 				// We just stop all the subsequent handlers from processing the event if one of them failed.
 				//
@@ -123,6 +122,8 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 				// this function.
 				break
 			}
+
+			log.Info("Event processed successfully")
 		}
 
 		// For now, we commit the message even if the handler failed to process it.
@@ -186,19 +187,19 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 // If the commit operation fails, it retries up to three times with a one-second pause between retries.
 // If all attempts fail, the function returns the last occurred error.
 func (app *Application) CommitMessage(ctx context.Context, msg kafka.Message) FoundationError {
-	var err error
-
-	// TODO: Make something clever here
+	// TODO: Make something clever here, like exponential backoff
 	for i := 0; i < 3; i++ {
-		if err = app.GetKafkaConsumer().CommitMessages(ctx, msg); err != nil {
-			if i < 2 {
-				time.Sleep(1 * time.Second)
-				continue
-			}
+		err := app.GetKafkaConsumer().CommitMessages(ctx, msg)
+		if err == nil {
+			return nil
 		}
 
-		return nil
+		if i == 2 {
+			return NewInternalError(err, "failed to commit message")
+		}
+
+		time.Sleep(1 * time.Second)
 	}
 
-	return NewInternalError(err, "failed to commit message")
+	return nil
 }

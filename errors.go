@@ -218,7 +218,7 @@ func (app *Application) foundationErrorToStatusInterceptor(ctx context.Context, 
 
 	if err != nil {
 		if fErr, ok := err.(FoundationError); ok {
-			app.ProcessError(fErr)
+			app.HandleError(fErr, "")
 
 			return h, fErr.GRPCStatus().Err()
 		}
@@ -227,10 +227,15 @@ func (app *Application) foundationErrorToStatusInterceptor(ctx context.Context, 
 	return h, err
 }
 
-func (app *Application) ProcessError(err FoundationError) {
+func (app *Application) HandleError(err FoundationError, prefix string) {
 	// Log internal errors
 	if _, ok := err.(*InternalError); ok {
-		app.Logger.Error(err.Error())
+		if prefix != "" {
+			app.Logger.Errorf("%s: %s", prefix, err.Error())
+		} else {
+			app.Logger.Error(err.Error())
+		}
+
 		sentry.CaptureException(err)
 	}
 }
