@@ -10,25 +10,25 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-// StartHTTPServerOptions are the options to start a Foundation application in server mode.
-type StartHTTPServerOptions struct {
+// HTTPServerOptions are the options to start a Foundation service in server mode.
+type HTTPServerOptions struct {
 	// Handler is the HTTP handler to use.
 	Handler http.Handler
 }
 
-func NewStartHTTPServerOptions() StartHTTPServerOptions {
-	return StartHTTPServerOptions{}
+func NewHTTPServerOptions() HTTPServerOptions {
+	return HTTPServerOptions{}
 }
 
-// StartHTTPServer starts a Foundation application in HTTP Server mode.
-func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
-	app.logStartup("http")
+// StartHTTPServer starts a Foundation service in HTTP Server mode.
+func (s *Service) StartHTTPServer(opts HTTPServerOptions) {
+	s.logStartup("http")
 
 	// Start common components
-	if err := app.StartComponents(); err != nil {
+	if err := s.StartComponents(); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -40,27 +40,27 @@ func (app *Application) StartHTTPServer(opts StartHTTPServerOptions) {
 		Handler: opts.Handler,
 	}
 
-	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
+	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			err = fmt.Errorf("failed to start server: %w", err)
+			err = fmt.Errorf("failed to start HTTP server: %w", err)
 			sentry.CaptureException(err)
-			app.Logger.Fatal(err)
+			s.Logger.Fatal(err)
 		}
 	}()
 
 	<-ctx.Done()
-	app.Logger.Println("Shutting down server...")
+	s.Logger.Println("Shutting down service...")
 
-	// Gracefully stop the server
+	// Gracefully stop the HTTP server
 	if err := server.Shutdown(context.Background()); err != nil {
-		err = fmt.Errorf("failed to gracefully shutdown server: %w", err)
+		err = fmt.Errorf("failed to gracefully shutdown HTTP server: %w", err)
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
-	app.StopComponents()
+	s.StopComponents()
 
-	app.Logger.Println("Application gracefully stopped")
+	s.Logger.Println("Service gracefully stopped")
 }

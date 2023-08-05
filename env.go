@@ -7,7 +7,7 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 )
 
-// Env represents the application environment name (development, production, etc).
+// Env represents the service environment name (development, production, etc).
 type Env string
 
 const (
@@ -16,22 +16,22 @@ const (
 	EnvTest        Env = "test"
 )
 
-// FoundationEnv returns the application environment name.
+// FoundationEnv returns the service environment name.
 func FoundationEnv() Env {
 	return Env(GetEnvOrString("FOUNDATION_ENV", string(EnvDevelopment)))
 }
 
-// IsProductionEnv returns true if the application is running in production mode.
+// IsProductionEnv returns true if the service is running in production mode.
 func IsProductionEnv() bool {
 	return FoundationEnv() == EnvProduction
 }
 
-// IsDevelopmentEnv returns true if the application is running in development mode.
+// IsDevelopmentEnv returns true if the service is running in development mode.
 func IsDevelopmentEnv() bool {
 	return FoundationEnv() == EnvDevelopment
 }
 
-// IsTestEnv returns true if the application is running in test mode.
+// IsTestEnv returns true if the service is running in test mode.
 func IsTestEnv() bool {
 	return FoundationEnv() == EnvTest
 }
@@ -52,6 +52,18 @@ func GetEnvOrBool(key string, defaultValue bool) bool {
 // argument, or defaultValue if there is no such variable set or it is empty.
 func GetEnvOrInt(key string, defaultValue int) int {
 	value, err := strconv.Atoi(os.Getenv(key))
+
+	if err != nil {
+		return defaultValue
+	}
+
+	return value
+}
+
+// GetEnvOrFloat returns the value of the environment variable named by the key
+// argument, or defaultValue if there is no such variable set or it is empty.
+func GetEnvOrFloat(key string, defaultValue float64) float64 {
+	value, err := strconv.ParseFloat(os.Getenv(key), 64)
 
 	if err != nil {
 		return defaultValue

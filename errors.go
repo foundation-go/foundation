@@ -213,12 +213,12 @@ func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion 
 	}
 }
 
-func (app *Application) foundationErrorToStatusInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func (s *Service) foundationErrorToStatusInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	h, err := handler(ctx, req)
 
 	if err != nil {
 		if fErr, ok := err.(FoundationError); ok {
-			app.HandleError(fErr, "")
+			s.HandleError(fErr, "")
 
 			return h, fErr.GRPCStatus().Err()
 		}
@@ -227,13 +227,13 @@ func (app *Application) foundationErrorToStatusInterceptor(ctx context.Context, 
 	return h, err
 }
 
-func (app *Application) HandleError(err FoundationError, prefix string) {
+func (s *Service) HandleError(err FoundationError, prefix string) {
 	// Log internal errors
 	if _, ok := err.(*InternalError); ok {
 		if prefix != "" {
-			app.Logger.Errorf("%s: %s", prefix, err.Error())
+			s.Logger.Errorf("%s: %s", prefix, err.Error())
 		} else {
-			app.Logger.Error(err.Error())
+			s.Logger.Error(err.Error())
 		}
 
 		sentry.CaptureException(err)

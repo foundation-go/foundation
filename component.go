@@ -1,7 +1,7 @@
 package foundation
 
 // Component describes an interface for all components in the Foundation framework.
-// This could be a service, a database, a cache, etc.
+// This could be an external service, a database, a cache, etc.
 type Component interface {
 	// Health returns the health of the component
 	Health() error
@@ -14,8 +14,8 @@ type Component interface {
 }
 
 // GetComponent returns the component with the given name.
-func (app *Application) GetComponent(name string) Component {
-	for _, component := range app.Components {
+func (s *Service) GetComponent(name string) Component {
+	for _, component := range s.Components {
 		if component.Name() == name {
 			return component
 		}

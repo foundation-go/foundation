@@ -21,49 +21,56 @@ const (
 	GatewayDefaultTimeout = 30 * time.Second
 )
 
-// StartGatewayOptions represents the options for starting the Foundation gateway.
-type StartGatewayOptions struct {
+// GatewayOptions represents the options for starting the Foundation gateway.
+type GatewayOptions struct {
 	// Services to register with the gateway
 	Services []gateway.Service
-	// Timeout for downstream services requests
+	// Timeout for downstream services requests (default: 30 seconds, if constructed with `NewGatewayOptions`)
 	Timeout time.Duration
-
+	// AuthenticationDetailsMiddleware is a middleware that populates the request context with authentication details.
 	AuthenticationDetailsMiddleware func(http.Handler) http.Handler
-
-	WithAuthentication   bool
+	// WithAuthentication enables authentication for the gateway.
+	WithAuthentication bool
+	// AuthenticationExcept is a list of paths that should not be authenticated.
 	AuthenticationExcept []string
-
+	// Middleware is a list of middleware to apply to the gateway. The middleware is applied in the order it is defined.
 	Middleware []func(http.Handler) http.Handler
 }
 
-func NewStartGatewayOptions() StartGatewayOptions {
-	return StartGatewayOptions{
+// NewGatewayOptions returns a new GatewayOptions with default values.
+func NewGatewayOptions() GatewayOptions {
+	return GatewayOptions{
 		Timeout: GatewayDefaultTimeout,
 	}
 }
 
 // StartGateway starts the Foundation gateway.
-func (app *Application) StartGateway(opts StartGatewayOptions) {
-	app.logStartup("gateway")
+func (s *Service) StartGateway(opts GatewayOptions) {
+	s.logStartup("gateway")
 
 	gw_runtime.DefaultContextTimeout = opts.Timeout
-	app.Logger.Debugf("Downstream requests timeout: %s", opts.Timeout)
+	s.Logger.Debugf("Downstream requests timeout: %s", opts.Timeout)
 
 	// Start common components
-	if err := app.StartComponents(); err != nil {
+	if err := s.StartComponents(); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
 		// TODO: Maybe flush sentry before exiting via Fatal?
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	mux, err := gateway.RegisterServices(
 		opts.Services,
-		gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
+		&gateway.RegisterServicesOptions{
+			MuxOpts: []gw_runtime.ServeMuxOption{
+				gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
+			},
+			TLSDir: s.Config.GRPC.TLSDir,
+		},
 	)
 	if err != nil {
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -72,39 +79,39 @@ func (app *Application) StartGateway(opts StartGatewayOptions) {
 	port := GetEnvOrInt("PORT", 51051)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: app.applyMiddleware(mux, opts),
+		Handler: s.applyMiddleware(mux, opts),
 	}
 
-	app.Logger.Infof("Listening on http://0.0.0.0:%d", port)
+	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			err = fmt.Errorf("failed to start server: %w", err)
 			sentry.CaptureException(err)
-			app.Logger.Fatal(err)
+			s.Logger.Fatal(err)
 		}
 	}()
 
 	<-ctx.Done()
-	app.Logger.Println("Shutting down server...")
+	s.Logger.Println("Shutting down service...")
 
-	// Gracefully stop the server
+	// Gracefully stop the HTTP server
 	if err := server.Shutdown(context.Background()); err != nil {
-		err = fmt.Errorf("failed to gracefully shutdown server: %w", err)
+		err = fmt.Errorf("failed to gracefully shutdown HTTP server: %w", err)
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
-	app.StopComponents()
+	s.StopComponents()
 
-	app.Logger.Println("Application gracefully stopped")
+	s.Logger.Println("Service gracefully stopped")
 }
 
-func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptions) http.Handler {
+func (s *Service) applyMiddleware(mux http.Handler, opts GatewayOptions) http.Handler {
 	var middleware []func(http.Handler) http.Handler
 
 	// General middleware
-	middleware = append(middleware, gateway.WithRequestLogger(app.Logger), gateway.WithCORSEnabled)
+	middleware = append(middleware, gateway.WithRequestLogger(s.Logger), gateway.WithCORSEnabled)
 
 	// Authentication details middleware
 	if opts.AuthenticationDetailsMiddleware != nil {
@@ -120,7 +127,7 @@ func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptio
 	middleware = append(middleware, opts.Middleware...)
 
 	// Log middleware chain
-	app.logMiddlewareChain(middleware)
+	s.logMiddlewareChain(middleware)
 
 	// Apply middleware in reverse order, so the order they are defined is the order they are applied
 	for i := len(middleware) - 1; i >= 0; i-- {
@@ -130,10 +137,10 @@ func (app *Application) applyMiddleware(mux http.Handler, opts StartGatewayOptio
 	return mux
 }
 
-func (app *Application) logMiddlewareChain(middleware []func(http.Handler) http.Handler) {
-	app.Logger.Info("Using middleware:")
+func (s *Service) logMiddlewareChain(middleware []func(http.Handler) http.Handler) {
+	s.Logger.Info("Using middleware:")
 
 	for _, m := range middleware {
-		app.Logger.Infof(" - %s", runtime.FuncForPC(reflect.ValueOf(m).Pointer()).Name())
+		s.Logger.Infof(" - %s", runtime.FuncForPC(reflect.ValueOf(m).Pointer()).Name())
 	}
 }

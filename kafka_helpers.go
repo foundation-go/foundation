@@ -27,46 +27,46 @@ func NewMessageFromEvent(event *Event) (*kafka.Message, error) {
 	return message, nil
 }
 
-func (app *Application) GetKafkaConsumer() *kafka.Reader {
-	component := app.GetComponent(fkafka.ConsumerComponentName)
+func (s *Service) GetKafkaConsumer() *kafka.Reader {
+	component := s.GetComponent(fkafka.ConsumerComponentName)
 	if component == nil {
 		err := errors.New("kafka consumer component is not registered")
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	consumer, ok := component.(*fkafka.ConsumerComponent)
 	if !ok {
 		err := errors.New("kafka consumer component is not of type *fkafka.ConsumerComponent")
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	return consumer.Consumer
 }
 
-func (app *Application) GetKafkaProducer() *kafka.Writer {
-	component := app.GetComponent(fkafka.ProducerComponentName)
+func (s *Service) GetKafkaProducer() *kafka.Writer {
+	component := s.GetComponent(fkafka.ProducerComponentName)
 	if component == nil {
 		err := errors.New("kafka producer component is not registered")
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	producer, ok := component.(*fkafka.ProducerComponent)
 	if !ok {
 		err := errors.New("kafka producer component is not of type *fkafka.ProducerComponent")
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	return producer.Producer
 }
 
-func (app *Application) getKafkaBrokers() ([]string, error) {
-	if len(app.Config.KafkaBrokers) == 0 {
+func (s *Service) getKafkaBrokers() ([]string, error) {
+	if len(s.Config.Kafka.Brokers) == 0 {
 		return nil, errors.New("KAFKA_BROKERS variable is not set")
 	}
 
-	return app.Config.KafkaBrokers, nil
+	return s.Config.Kafka.Brokers, nil
 }

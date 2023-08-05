@@ -10,13 +10,13 @@ import (
 )
 
 func TestHealthHandler(t *testing.T) {
-	app := &Application{
+	app := &Service{
 		Config: &Config{},
 		Logger: initLogger("test"),
 	}
 
 	// Actual test function
-	assertExample := func(app *Application, expectedStatusCode int) {
+	assertExample := func(s *Service, expectedStatusCode int) {
 		t.Helper()
 
 		req, err := http.NewRequest(http.MethodGet, "/", nil)
@@ -25,7 +25,7 @@ func TestHealthHandler(t *testing.T) {
 		}
 
 		w := httptest.NewRecorder()
-		app.healthHandler(w, req)
+		s.healthHandler(w, req)
 
 		if w.Code != expectedStatusCode {
 			t.Errorf("Expected status code %d, but got %d", expectedStatusCode, w.Code)

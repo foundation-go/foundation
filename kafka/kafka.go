@@ -1,8 +1,12 @@
 package kafka
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -27,6 +31,7 @@ type ConsumerComponent struct {
 	brokers []string
 	logger  *logrus.Entry
 	topics  []string
+	tlsDir  string
 }
 
 // ConsumerComponentOption represents an option for the ConsumerComponent
@@ -60,6 +65,13 @@ func WithConsumerTopics(topics []string) ConsumerComponentOption {
 	}
 }
 
+// WithConsumerTLSDir sets the location of the TLS directory for the ConsumerComponent
+func WithConsumerTLSDir(tlsDir string) ConsumerComponentOption {
+	return func(c *ConsumerComponent) {
+		c.tlsDir = tlsDir
+	}
+}
+
 // NewConsumerComponent returns a new ConsumerComponent
 func NewConsumerComponent(opts ...ConsumerComponentOption) *ConsumerComponent {
 	c := &ConsumerComponent{}
@@ -78,12 +90,21 @@ func (c *ConsumerComponent) Start() error {
 	}
 	c.logger.Debugf("Kafka consumer topics: %v", c.topics)
 
-	consumer := kafka.NewReader(kafka.ReaderConfig{
+	config := kafka.ReaderConfig{
 		Brokers:     c.brokers,
 		GroupID:     fmt.Sprintf("%s-foundation", c.appName),
 		GroupTopics: c.topics,
 		ErrorLogger: c.logger,
-	})
+	}
+
+	dialer, err := newDialer(c.tlsDir)
+	if err != nil {
+		return err
+	}
+
+	config.Dialer = dialer
+
+	consumer := kafka.NewReader(config)
 
 	c.Consumer = consumer
 
@@ -117,6 +138,7 @@ type ProducerComponent struct {
 
 	brokers []string
 	logger  *logrus.Entry
+	tlsDir  string
 }
 
 // ProducerComponentOption represents an option for the ProducerComponent
@@ -136,6 +158,13 @@ func WithProducerLogger(logger *logrus.Entry) ProducerComponentOption {
 	}
 }
 
+// WithProducerTLSDir sets the location of the TLS files for the ProducerComponent
+func WithProducerTLSDir(tlsDir string) ProducerComponentOption {
+	return func(c *ProducerComponent) {
+		c.tlsDir = tlsDir
+	}
+}
+
 // NewProducerComponent returns a new ProducerComponent
 func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 	c := &ProducerComponent{}
@@ -149,12 +178,18 @@ func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 
 // Start implements the Component interface.
 func (c *ProducerComponent) Start() error {
+	transport, err := newTransport(c.tlsDir)
+	if err != nil {
+		return err
+	}
+
 	producer := &kafka.Writer{
 		Addr:                   kafka.TCP(c.brokers...),
 		AllowAutoTopicCreation: true,
 		BatchSize:              1,               // TODO: make this configurable
 		BatchTimeout:           1 * time.Second, // TODO: make this configurable
 		Logger:                 c.logger,
+		Transport:              transport,
 	}
 
 	c.Producer = producer
@@ -181,4 +216,62 @@ func (c *ProducerComponent) Health() error {
 // Name implements the Component interface.
 func (c *ProducerComponent) Name() string {
 	return ProducerComponentName
+}
+
+func newDialer(tlsDir string) (*kafka.Dialer, error) {
+	if tlsDir == "" {
+		return nil, nil
+	}
+
+	tlsConfig, err := newTLSConfig(tlsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kafka.Dialer{
+		Timeout:   10 * time.Second,
+		DualStack: true,
+		TLS:       tlsConfig,
+	}, nil
+}
+
+func newTransport(tlsDir string) (*kafka.Transport, error) {
+	if tlsDir == "" {
+		return nil, nil
+	}
+
+	tlsConfig, err := newTLSConfig(tlsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kafka.Transport{
+		TLS: tlsConfig,
+	}, nil
+}
+
+func newTLSConfig(dir string) (*tls.Config, error) {
+	certFile := filepath.Join(dir, "tls.crt")
+	keyFile := filepath.Join(dir, "tls.key")
+	caFile := filepath.Join(dir, "ca.crt")
+
+	tlsConfig := &tls.Config{}
+
+	// Load client cert
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+	tlsConfig.Certificates = []tls.Certificate{cert}
+
+	// Load CA cert
+	caCert, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, err
+	}
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+	tlsConfig.RootCAs = caCertPool
+
+	return tlsConfig, nil
 }

@@ -6,9 +6,10 @@ import (
 )
 
 func TestFoundationEnv(t *testing.T) {
-	// Test that the default environment is development
+	// Test that the default environment is current environment
+	expectedEnv := Env(GetEnvOrString("FOUNDATION_ENV", string(EnvDevelopment)))
 	env := FoundationEnv()
-	if env != EnvDevelopment {
+	if env != expectedEnv {
 		t.Errorf("Expected default environment to be %s, but got %s", EnvDevelopment, env)
 	}
 
@@ -99,6 +100,31 @@ func TestGetEnvOrInt(t *testing.T) {
 	value = GetEnvOrInt(envVar, defaultValue)
 	if value != defaultValue {
 		t.Errorf("Expected value to be %d, but got %d", defaultValue, value)
+	}
+}
+
+func TestGetEnvOrFloat(t *testing.T) {
+	// Test that the function returns the default value when the environment variable is not set
+	defaultValue := 123.456
+	value := GetEnvOrFloat("NON_EXISTING_ENV_VAR", defaultValue)
+	if value != defaultValue {
+		t.Errorf("Expected value to be %f, but got %f", defaultValue, value)
+	}
+
+	// Test that the function returns the environment variable value when it is set
+	envVar := "ENV_VAR"
+	envVarValue := "456.789"
+	os.Setenv(envVar, envVarValue)
+	value = GetEnvOrFloat(envVar, defaultValue)
+	if value != 456.789 {
+		t.Errorf("Expected value to be 456.789, but got %f", value)
+	}
+
+	// Test that the function returns the default value when the environment variable value is not a valid float
+	os.Setenv(envVar, "not_a_float")
+	value = GetEnvOrFloat(envVar, defaultValue)
+	if value != defaultValue {
+		t.Errorf("Expected value to be %f, but got %f", defaultValue, value)
 	}
 }
 

@@ -10,14 +10,18 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-// StartWorkerOptions are the options to start a Foundation application in worker mode.
-type StartWorkerOptions struct {
+const (
+	WorkerDefaultInterval = 5 * time.Millisecond
+)
+
+// WorkerOptions are the options to start a Foundation service in worker mode.
+type WorkerOptions struct {
 	// ProcessFunc is the function to execute in the loop iteration.
 	ProcessFunc func(ctx context.Context) FoundationError
 
 	// Interval is the interval to run the iteration function. If function execution took less time than the interval,
 	// the worker will sleep for the remaining time of the interval. Otherwise, the function will be executed again
-	// immediately.
+	// immediately. Default: 5ms, if constructed with NewWorkerOptions().
 	Interval time.Duration
 
 	// ModeName is the name of the worker mode. It will be used in the startup log message. Default: "worker".
@@ -27,29 +31,30 @@ type StartWorkerOptions struct {
 	StartComponentsOptions []StartComponentsOption
 }
 
-func NewStartWorkerOptions() StartWorkerOptions {
-	return StartWorkerOptions{
+// NewWorkerOptions returns a new WorkerOptions instance with default values.
+func NewWorkerOptions() WorkerOptions {
+	return WorkerOptions{
 		ModeName: "worker",
-		Interval: 5 * time.Millisecond,
+		Interval: WorkerDefaultInterval,
 	}
 }
 
-// StartWorker starts a Foundation application in worker mode.
-func (app *Application) StartWorker(opts StartWorkerOptions) {
-	app.logStartup(opts.ModeName)
+// StartWorker starts a Foundation service in worker mode.
+func (s *Service) StartWorker(opts WorkerOptions) {
+	s.logStartup(opts.ModeName)
 
 	// Start common components
-	if err := app.StartComponents(opts.StartComponentsOptions...); err != nil {
+	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
-		app.Logger.Fatal(err)
+		s.Logger.Fatal(err)
 	}
 
 	// Watch for termination signals
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Run the iteration function in a loop until the application is stopped
+	// Run the iteration function in a loop until the service is stopped
 	go func() {
 	Loop:
 		for {
@@ -60,7 +65,7 @@ func (app *Application) StartWorker(opts StartWorkerOptions) {
 				started := time.Now()
 
 				if err := opts.ProcessFunc(ctx); err != nil {
-					app.HandleError(err, "failed to process iteration")
+					s.HandleError(err, "failed to process iteration")
 				}
 
 				// Sleep for the remaining time of the interval
@@ -73,9 +78,9 @@ func (app *Application) StartWorker(opts StartWorkerOptions) {
 
 	<-ctx.Done()
 
-	app.Logger.Infof("Shutting down %s...", opts.ModeName)
+	s.Logger.Info("Shutting down service...")
 
-	app.StopComponents()
+	s.StopComponents()
 
-	app.Logger.Println("Application gracefully stopped")
+	s.Logger.Info("Service gracefully stopped")
 }

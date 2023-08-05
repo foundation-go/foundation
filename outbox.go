@@ -75,12 +75,12 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 }
 
 // publishEventToOutbox publishes an event to the outbox.
-func (app *Application) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
 	commitNeeded := false
 
 	if tx == nil {
 		// Start transaction
-		tx, err := app.GetPostgreSQL().Begin()
+		tx, err := s.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -116,13 +116,13 @@ func (app *Application) publishEventToOutbox(ctx context.Context, event *Event, 
 }
 
 // publishEventToKafka publishes an event to the Kafka topic.
-func (app *Application) publishEventToKafka(ctx context.Context, event *Event) FoundationError {
+func (s *Service) publishEventToKafka(ctx context.Context, event *Event) FoundationError {
 	message, err := NewMessageFromEvent(event)
 	if err != nil {
 		return NewInternalError(err, "failed to create message from event")
 	}
 
-	if err := app.GetKafkaProducer().WriteMessages(ctx, *message); err != nil {
+	if err := s.GetKafkaProducer().WriteMessages(ctx, *message); err != nil {
 		return NewInternalError(err, "failed to publish event to Kafka")
 	}
 
@@ -131,31 +131,31 @@ func (app *Application) publishEventToKafka(ctx context.Context, event *Event) F
 
 // PublishEvent publishes an event to the outbox, starting a new transaction,
 // or straight to the Kafka topic if `OUTBOX_ENABLED` is not set.
-func (app *Application) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
 	event = addDefaultHeaders(ctx, event)
 
 	if OutboxEnabled {
-		return app.publishEventToOutbox(ctx, event, tx)
+		return s.publishEventToOutbox(ctx, event, tx)
 	}
 
-	return app.publishEventToKafka(ctx, event)
+	return s.publishEventToKafka(ctx, event)
 }
 
 // NewAndPublishEvent creates a new event and publishes it to the outbox within a transaction
-func (app *Application) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) FoundationError {
+func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) FoundationError {
 	event, err := NewEventFromProto(msg, key, headers)
 	if err != nil {
 		return err
 	}
 
-	return app.PublishEvent(ctx, event, tx)
+	return s.PublishEvent(ctx, event, tx)
 }
 
 // WithTransaction executes the given function in a transaction. If the function
 // returns an event, it will be published.
-func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, FoundationError)) FoundationError {
+func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, FoundationError)) FoundationError {
 	// Start transaction
-	tx, err := app.GetPostgreSQL().Begin()
+	tx, err := s.GetPostgreSQL().Begin()
 	if err != nil {
 		return NewInternalError(err, "failed to begin transaction")
 	}
@@ -169,7 +169,7 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 
 	// Publish event (if any)
 	if event != nil {
-		if err = app.PublishEvent(ctx, event, tx); err != nil {
+		if err = s.PublishEvent(ctx, event, tx); err != nil {
 			return NewInternalError(err, "failed to publish event")
 		}
 	}
@@ -183,8 +183,8 @@ func (app *Application) WithTransaction(ctx context.Context, f func(tx *sql.Tx) 
 }
 
 // ListOutboxEvents returns a list of outbox events in the order they were created.
-func (app *Application) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, FoundationError) {
-	queries := outboxrepo.New(app.GetPostgreSQL())
+func (s *Service) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, FoundationError) {
+	queries := outboxrepo.New(s.GetPostgreSQL())
 
 	events, err := queries.ListOutboxEvents(ctx, limit)
 	if err != nil {
@@ -195,8 +195,8 @@ func (app *Application) ListOutboxEvents(ctx context.Context, limit int32) ([]ou
 }
 
 // DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
-func (app *Application) DeleteOutboxEvents(ctx context.Context, maxID int64) FoundationError {
-	queries := outboxrepo.New(app.GetPostgreSQL())
+func (s *Service) DeleteOutboxEvents(ctx context.Context, maxID int64) FoundationError {
+	queries := outboxrepo.New(s.GetPostgreSQL())
 
 	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {
 		return NewInternalError(err, "failed to `DeleteOutboxEvents`")

@@ -5,17 +5,17 @@ import (
 )
 
 func TestGetBrokers(t *testing.T) {
-	app := Application{Config: &Config{}}
+	app := Service{Config: NewConfig()}
 
 	// Test case 1: KAFKA_BROKERS is not set
-	app.Config.KafkaBrokers = []string{}
+	app.Config.Kafka.Brokers = []string{}
 	_, err := app.getKafkaBrokers()
 	if err == nil {
 		t.Errorf("Expected error, but got nil")
 	}
 
 	// Test case 2: KAFKA_BROKERS is set with one broker
-	app.Config.KafkaBrokers = []string{"localhost:9092"}
+	app.Config.Kafka.Brokers = []string{"localhost:9092"}
 	brokers, err := app.getKafkaBrokers()
 	if err != nil {
 		t.Errorf("Expected nil error, but got %v", err)

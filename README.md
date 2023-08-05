@@ -26,8 +26,9 @@ Foundation is built upon several proven technologies including:
 - [x] **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
 - [x] **Unified Logging**: Conveniently log with colors during development and structured logging in production using `logrus`.
 - [ ] **Tracing**: Trace and log your requests in a structured format with OpenTracing.
-- [x] **Metrics**: Collect and expose application metrics to Prometheus.
-- [x] **Health Check**: Provide Kubernetes with health status of your application.
+- [x] **Metrics**: Collect and expose service metrics to Prometheus.
+- [x] **Health Check**: Provide Kubernetes with health status of your service.
+- [x] **(m)TLS**: TLS authentication for Kafka and mTLS for gRPC.
 - [x] **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
 - [ ] **Helpers**: A variety of helpers for common tasks.
 

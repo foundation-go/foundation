@@ -28,9 +28,9 @@ func initLogger(appName string) *log.Entry {
 	return logger.WithField("app", appName)
 }
 
-func (app *Application) logStartup(mode string) {
-	app.Logger.Infof("Starting application")
-	app.Logger.Infof(" - Mode:        %s", mode)
-	app.Logger.Infof(" - Environment: %s", FoundationEnv())
-	app.Logger.Infof(" - Foundation:  v%s", Version)
+func (s *Service) logStartup(mode string) {
+	s.Logger.Infof("Starting service `%s`", s.Name)
+	s.Logger.Infof(" - Mode:        %s", mode)
+	s.Logger.Infof(" - Environment: %s", FoundationEnv())
+	s.Logger.Infof(" - Foundation:  v%s", Version)
 }

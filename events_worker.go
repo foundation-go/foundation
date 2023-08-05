@@ -18,13 +18,13 @@ type EventHandler interface {
 	Handle(ctx context.Context, event *Event) ([]*Event, FoundationError)
 }
 
-// StartEventsWorkerOptions represents the options for starting an events worker
-type StartEventsWorkerOptions struct {
+// EventsWorkerOptions represents the options for starting an events worker
+type EventsWorkerOptions struct {
 	Handlers map[string][]EventHandler
 	Topics   []string
 }
 
-func (opts *StartEventsWorkerOptions) GetTopics() []string {
+func (opts *EventsWorkerOptions) GetTopics() []string {
 	// If topics are specified in the options, use them
 	if len(opts.Topics) > 0 {
 		return opts.Topics
@@ -65,15 +65,15 @@ func (opts *StartEventsWorkerOptions) GetTopics() []string {
 }
 
 // StartEventsWorker starts a worker that handles events
-func (app *Application) StartEventsWorker(opts *StartEventsWorkerOptions) {
-	wOpts := NewStartWorkerOptions()
+func (s *Service) StartEventsWorker(opts *EventsWorkerOptions) {
+	wOpts := NewWorkerOptions()
 	wOpts.ModeName = "events_worker"
-	wOpts.ProcessFunc = app.newProcessEventFunc(opts.Handlers)
+	wOpts.ProcessFunc = s.newProcessEventFunc(opts.Handlers)
 	wOpts.StartComponentsOptions = []StartComponentsOption{
 		WithKafkaConsumerTopics(opts.GetTopics()...),
 	}
 
-	app.StartWorker(wOpts)
+	s.StartWorker(wOpts)
 }
 
 func newEventFromKafkaMessage(msg *kafka.Message) *Event {
@@ -92,9 +92,9 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
+func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
 	return func(ctx context.Context) FoundationError {
-		msg, err := app.GetKafkaConsumer().FetchMessage(ctx)
+		msg, err := s.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
 			return NewInternalError(err, "failed to read message from Kafka")
 		}
@@ -103,7 +103,7 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 
 		var handleErr FoundationError
 
-		log := app.Logger.WithFields(map[string]interface{}{
+		log := s.Logger.WithFields(map[string]interface{}{
 			"correlation_id": event.Headers[fkafka.HeaderCorrelationID],
 			"event":          event.ProtoName,
 		})
@@ -113,7 +113,7 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 			log := log.WithField("handler", fmt.Sprintf("%T", handler))
 			log.Info("Processing event")
 
-			handleErr = app.processEvent(ctx, handler, event)
+			handleErr = s.processEvent(ctx, handler, event)
 			if handleErr != nil {
 				// We just stop all the subsequent handlers from processing the event if one of them failed.
 				//
@@ -130,7 +130,7 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 		//
 		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
 		// Or maybe publish the message to a dead-letter topic.
-		if commitErr := app.CommitMessage(ctx, msg); commitErr != nil {
+		if commitErr := s.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
 		}
 
@@ -138,15 +138,15 @@ func (app *Application) newProcessEventFunc(handlers map[string][]EventHandler) 
 	}
 }
 
-func (app *Application) processEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
+func (s *Service) processEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
 	var (
 		tx         *sql.Tx
 		needCommit bool
 		err        error
 	)
 
-	if app.Config.DatabaseEnabled {
-		tx, err = app.GetPostgreSQL().Begin()
+	if s.Config.Database.Enabled {
+		tx, err = s.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -168,7 +168,7 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 
 	// Publish outgoing events
 	for _, e := range events {
-		if publishErr := app.PublishEvent(ctx, e, tx); publishErr != nil {
+		if publishErr := s.PublishEvent(ctx, e, tx); publishErr != nil {
 			return publishErr
 		}
 	}
@@ -183,13 +183,13 @@ func (app *Application) processEvent(ctx context.Context, handler EventHandler, 
 	return nil
 }
 
-// CommitMessage tries to commit a Kafka message using the application's KafkaConsumer.
+// CommitMessage tries to commit a Kafka message using the service's KafkaConsumer.
 // If the commit operation fails, it retries up to three times with a one-second pause between retries.
 // If all attempts fail, the function returns the last occurred error.
-func (app *Application) CommitMessage(ctx context.Context, msg kafka.Message) FoundationError {
+func (s *Service) CommitMessage(ctx context.Context, msg kafka.Message) FoundationError {
 	// TODO: Make something clever here, like exponential backoff
 	for i := 0; i < 3; i++ {
-		err := app.GetKafkaConsumer().CommitMessages(ctx, msg)
+		err := s.GetKafkaConsumer().CommitMessages(ctx, msg)
 		if err == nil {
 			return nil
 		}

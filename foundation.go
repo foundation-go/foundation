@@ -12,10 +12,11 @@ import (
 	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
-const Version = "0.1.0"
+const Version = "0.1.1"
 
-// Application represents a Foundation application.
-type Application struct {
+// Service represents a single microservice - part of the bigger Foundation-based application, which implements
+// an isolated domain of the application logic.
+type Service struct {
 	Name       string
 	Config     *Config
 	Components []Component
@@ -23,40 +24,94 @@ type Application struct {
 	Logger *logrus.Entry
 }
 
+// Config represents the configuration of a Service.
 type Config struct {
-	DatabaseEnabled      bool
-	DatabasePool         int
-	DatabaseURL          string
-	MetricsEnabled       bool
-	MetricsPort          int
-	KafkaBrokers         []string
-	KafkaConsumerEnabled bool
-	KafkaConsumerTopics  []string
-	KafkaProducerEnabled bool
-	SentryDSN            string
-	SentryEnabled        bool
+	Database *DatabaseConfig
+	GRPC     *GRPCConfig
+	Kafka    *KafkaConfig
+	Metrics  *MetricsConfig
+	Sentry   *SentryConfig
+}
+
+// DatabaseConfig represents the configuration of a PostgreSQL database.
+type DatabaseConfig struct {
+	Enabled bool
+	Pool    int
+	URL     string
+}
+
+// GRPCConfig represents the configuration of a gRPC server.
+type GRPCConfig struct {
+	TLSDir string
+}
+
+// KafkaConfig represents the configuration of a Kafka client.
+type KafkaConfig struct {
+	Brokers  []string
+	Consumer *KafkaConsumerConfig
+	Producer *KafkaProducerConfig
+	TLSDir   string
+}
+
+// KafkaConsumerConfig represents the configuration of a Kafka consumer.
+type KafkaConsumerConfig struct {
+	Enabled bool
+	Topics  []string
+}
+
+// KafkaProducerConfig represents the configuration of a Kafka producer.
+type KafkaProducerConfig struct {
+	Enabled bool
+}
+
+// MetricsConfig represents the configuration of a metrics server.
+type MetricsConfig struct {
+	Enabled bool
+	Port    int
+}
+
+// SentryConfig represents the configuration of a Sentry client.
+type SentryConfig struct {
+	DSN     string
+	Enabled bool
 }
 
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
-		DatabaseEnabled:      len(GetEnvOrString("DATABASE_URL", "")) > 0,
-		DatabasePool:         GetEnvOrInt("DATABASE_POOL", 5),
-		DatabaseURL:          GetEnvOrString("DATABASE_URL", ""),
-		MetricsEnabled:       GetEnvOrBool("METRICS_ENABLED", true),
-		MetricsPort:          GetEnvOrInt("METRICS_PORT", 51077),
-		KafkaBrokers:         strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
-		KafkaConsumerEnabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
-		KafkaConsumerTopics:  nil,
-		KafkaProducerEnabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
-		SentryDSN:            GetEnvOrString("SENTRY_DSN", ""),
-		SentryEnabled:        len(GetEnvOrString("SENTRY_DSN", "")) > 0,
+		Database: &DatabaseConfig{
+			Enabled: len(GetEnvOrString("DATABASE_URL", "")) > 0,
+			Pool:    GetEnvOrInt("DATABASE_POOL", 5),
+			URL:     GetEnvOrString("DATABASE_URL", ""),
+		},
+		GRPC: &GRPCConfig{
+			TLSDir: GetEnvOrString("GRPC_TLS_DIR", ""),
+		},
+		Kafka: &KafkaConfig{
+			Brokers: strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
+			Consumer: &KafkaConsumerConfig{
+				Enabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
+				Topics:  nil,
+			},
+			Producer: &KafkaProducerConfig{
+				Enabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
+			},
+			TLSDir: GetEnvOrString("KAFKA_TLS_DIR", ""),
+		},
+		Metrics: &MetricsConfig{
+			Enabled: GetEnvOrBool("METRICS_ENABLED", true),
+			Port:    GetEnvOrInt("METRICS_PORT", 51077),
+		},
+		Sentry: &SentryConfig{
+			DSN:     GetEnvOrString("SENTRY_DSN", ""),
+			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
+		},
 	}
 }
 
-// Init initializes the Foundation application.
-func Init(name string) *Application {
-	return &Application{
+// Init initializes the Foundation service.
+func Init(name string) *Service {
+	return &Service{
 		Name:   name,
 		Config: NewConfig(),
 		Logger: initLogger(name),
@@ -64,82 +119,84 @@ func Init(name string) *Application {
 }
 
 // StartComponentsOption is an option to `StartComponents`.
-type StartComponentsOption func(*Application)
+type StartComponentsOption func(*Service)
 
 // WithKafkaConsumerTopics sets the Kafka consumer topics.
 func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
-	return func(app *Application) {
-		app.Config.KafkaConsumerTopics = topics
+	return func(s *Service) {
+		s.Config.Kafka.Consumer.Topics = topics
 	}
 }
 
-func (app *Application) addSystemComponents() error {
+func (s *Service) addSystemComponents() error {
 	// Remove user-defined components in order to add system components first.
-	existedComponents := app.Components
-	app.Components = []Component{}
+	existedComponents := s.Components
+	s.Components = []Component{}
 
 	// Sentry
-	if app.Config.SentryEnabled {
-		app.Components = append(app.Components, fsentry.NewComponent(app.Config.SentryDSN))
+	if s.Config.Sentry.Enabled {
+		s.Components = append(s.Components, fsentry.NewComponent(s.Config.Sentry.DSN))
 	}
 
 	// PostgreSQL
-	if app.Config.DatabaseEnabled {
-		app.Components = append(app.Components, fpg.NewPostgreSQLComponent(
-			fpg.WithDatabaseURL(app.Config.DatabaseURL),
-			fpg.WithPoolSize(app.Config.DatabasePool),
-			fpg.WithLogger(app.Logger),
+	if s.Config.Database.Enabled {
+		s.Components = append(s.Components, fpg.NewPostgreSQLComponent(
+			fpg.WithDatabaseURL(s.Config.Database.URL),
+			fpg.WithLogger(s.Logger),
+			fpg.WithPoolSize(s.Config.Database.Pool),
 		))
 	}
 
 	// Kafka consumer
-	if app.Config.KafkaConsumerEnabled {
-		app.Components = append(app.Components, fkafka.NewConsumerComponent(
-			fkafka.WithConsumerAppName(app.Name),
-			fkafka.WithConsumerBrokers(app.Config.KafkaBrokers),
-			fkafka.WithConsumerTopics(app.Config.KafkaConsumerTopics),
-			fkafka.WithConsumerLogger(app.Logger),
+	if s.Config.Kafka.Consumer.Enabled {
+		s.Components = append(s.Components, fkafka.NewConsumerComponent(
+			fkafka.WithConsumerAppName(s.Name),
+			fkafka.WithConsumerBrokers(s.Config.Kafka.Brokers),
+			fkafka.WithConsumerLogger(s.Logger),
+			fkafka.WithConsumerTLSDir(s.Config.Kafka.TLSDir),
+			fkafka.WithConsumerTopics(s.Config.Kafka.Consumer.Topics),
 		))
 	}
 
 	// Kafka producer
-	if app.Config.KafkaProducerEnabled {
-		app.Components = append(app.Components, fkafka.NewProducerComponent(
-			fkafka.WithProducerBrokers(app.Config.KafkaBrokers),
-			fkafka.WithProducerLogger(app.Logger),
+	if s.Config.Kafka.Producer.Enabled {
+		s.Components = append(s.Components, fkafka.NewProducerComponent(
+			fkafka.WithProducerBrokers(s.Config.Kafka.Brokers),
+			fkafka.WithProducerLogger(s.Logger),
+			fkafka.WithProducerTLSDir(s.Config.Kafka.TLSDir),
 		))
 	}
 
 	// Metrics server
-	if app.Config.MetricsEnabled {
-		app.Components = append(app.Components, NewMetricsServerComponent(
-			WithMetricsServerHealthHandler(app.healthHandler),
-			WithMetricsServerLogger(app.Logger),
-			WithMetricsServerPort(app.Config.MetricsPort),
+	if s.Config.Metrics.Enabled {
+		s.Components = append(s.Components, NewMetricsServerComponent(
+			WithMetricsServerHealthHandler(s.healthHandler),
+			WithMetricsServerLogger(s.Logger),
+			WithMetricsServerPort(s.Config.Metrics.Port),
 		))
 	}
 
 	// Add user-defined components back
-	app.Components = append(app.Components, existedComponents...)
+	s.Components = append(s.Components, existedComponents...)
 
 	return nil
 }
 
-// StartComponents starts the default Foundation application components.
-func (app *Application) StartComponents(opts ...StartComponentsOption) error {
+// StartComponents starts the default Foundation service components.
+func (s *Service) StartComponents(opts ...StartComponentsOption) error {
 	// Apply options
 	for _, opt := range opts {
-		opt(app)
+		opt(s)
 	}
 
-	if err := app.addSystemComponents(); err != nil {
+	if err := s.addSystemComponents(); err != nil {
 		return err
 	}
 
-	app.Logger.Info("Starting components:")
+	s.Logger.Info("Starting components:")
 
-	for _, component := range app.Components {
-		app.Logger.Infof(" - %s", component.Name())
+	for _, component := range s.Components {
+		s.Logger.Infof(" - %s", component.Name())
 
 		if err := component.Start(); err != nil {
 			return fmt.Errorf("%s: %w", component.Name(), err)
@@ -149,18 +206,18 @@ func (app *Application) StartComponents(opts ...StartComponentsOption) error {
 	return nil
 }
 
-// StopComponents stops the default Foundation application components.
-func (app *Application) StopComponents() {
-	app.Logger.Info("Stopping components:")
+// StopComponents stops the default Foundation service components.
+func (s *Service) StopComponents() {
+	s.Logger.Info("Stopping components:")
 
 	// Stop components in reverse order, so that dependencies are stopped first
-	for i := len(app.Components) - 1; i >= 0; i-- {
-		app.Logger.Infof(" - %s", app.Components[i].Name())
+	for i := len(s.Components) - 1; i >= 0; i-- {
+		s.Logger.Infof(" - %s", s.Components[i].Name())
 
-		if err := app.Components[i].Stop(); err != nil {
-			err = fmt.Errorf("failed to stop component `%s`: %w", app.Components[i].Name(), err)
+		if err := s.Components[i].Stop(); err != nil {
+			err = fmt.Errorf("failed to stop component `%s`: %w", s.Components[i].Name(), err)
 			sentry.CaptureException(err)
-			app.Logger.Error(err)
+			s.Logger.Error(err)
 		}
 	}
 }
