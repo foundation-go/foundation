@@ -237,7 +237,7 @@ func newDialer(tlsDir string) (*kafka.Dialer, error) {
 
 func newTransport(tlsDir string) (*kafka.Transport, error) {
 	if tlsDir == "" {
-		return nil, nil
+		return &kafka.Transport{}, nil
 	}
 
 	tlsConfig, err := newTLSConfig(tlsDir)
