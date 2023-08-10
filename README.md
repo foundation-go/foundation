@@ -30,7 +30,8 @@ Foundation is built upon several proven technologies including:
 - [x] **Health Check**: Provide Kubernetes with health status of your service.
 - [x] **(m)TLS**: TLS authentication for Kafka and mTLS for gRPC.
 - [x] **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
-- [ ] **Helpers**: A variety of helpers for common tasks.
+- [x] **Helpers**: A variety of helpers for common tasks.
+- [ ] **CLI**: A CLI tool to help you get started and manage your project.
 
 ## Integrations
 
@@ -46,6 +47,26 @@ Foundation comes with built-in support for:
 ## Getting Started
 
 Currently, the best way to get started is by exploring the codebase. We're working on providing sample implementations and thorough documentation to make the onboarding process even smoother. Stay tuned!
+
+## CLI Tool
+
+To install the CLI tool, run:
+
+```bash
+go install github.com/ri-nat/foundation/cmd/foundation@main
+```
+
+There are several commands available:
+
+```bash
+foundation completion # Generate shell completion scripts (prints to stdout)
+foundation db:migrate # Run database migrations
+foundation db:rollback # Rollback database migrations
+foundation start # Start the service (you will be prompted to choose a service to start)
+foundation test # Run tests
+```
+
+You can also run `foundation` without any arguments to see a list of available commands, or run `foundation <command> --help` to see the available options for a specific command.
 
 ## Contributing
 
