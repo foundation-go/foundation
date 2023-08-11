@@ -14,6 +14,9 @@ import (
 type HTTPServerOptions struct {
 	// Handler is the HTTP handler to use.
 	Handler http.Handler
+
+	// StartComponentsOptions are the options to start the components.
+	StartComponentsOptions []StartComponentsOption
 }
 
 func NewHTTPServerOptions() HTTPServerOptions {
@@ -25,7 +28,7 @@ func (s *Service) StartHTTPServer(opts HTTPServerOptions) {
 	s.logStartup("http")
 
 	// Start common components
-	if err := s.StartComponents(); err != nil {
+	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
 		s.Logger.Fatal(err)

@@ -20,6 +20,9 @@ type GRPCServerOptions struct {
 
 	// GRPCServerOptions are the gRPC server options to use.
 	GRPCServerOptions []grpc.ServerOption
+
+	// StartComponentsOptions are the options to start the components.
+	StartComponentsOptions []StartComponentsOption
 }
 
 func NewGRPCServerOptions() GRPCServerOptions {
@@ -31,7 +34,7 @@ func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
 	s.logStartup("grpc")
 
 	// Start common components
-	if err := s.StartComponents(); err != nil {
+	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
 		s.Logger.Fatalf("Failed to start components: %v", err)

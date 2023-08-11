@@ -20,8 +20,9 @@ type EventHandler interface {
 
 // EventsWorkerOptions represents the options for starting an events worker
 type EventsWorkerOptions struct {
-	Handlers map[string][]EventHandler
-	Topics   []string
+	Handlers             map[string][]EventHandler
+	Topics               []string
+	KafkaProducerEnabled bool
 }
 
 func (opts *EventsWorkerOptions) GetTopics() []string {
@@ -70,7 +71,12 @@ func (s *Service) StartEventsWorker(opts *EventsWorkerOptions) {
 	wOpts.ModeName = "events_worker"
 	wOpts.ProcessFunc = s.newProcessEventFunc(opts.Handlers)
 	wOpts.StartComponentsOptions = []StartComponentsOption{
+		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
+	}
+
+	if opts.KafkaProducerEnabled {
+		wOpts.StartComponentsOptions = append(wOpts.StartComponentsOptions, WithKafkaProducer())
 	}
 
 	s.StartWorker(wOpts)

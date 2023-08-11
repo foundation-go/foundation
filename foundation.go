@@ -30,6 +30,7 @@ type Config struct {
 	GRPC     *GRPCConfig
 	Kafka    *KafkaConfig
 	Metrics  *MetricsConfig
+	Outbox   *OutboxConfig
 	Sentry   *SentryConfig
 }
 
@@ -76,6 +77,11 @@ type SentryConfig struct {
 	Enabled bool
 }
 
+// OutboxConfig represents the configuration of an outbox.
+type OutboxConfig struct {
+	Enabled bool
+}
+
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
@@ -90,17 +96,20 @@ func NewConfig() *Config {
 		Kafka: &KafkaConfig{
 			Brokers: strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
 			Consumer: &KafkaConsumerConfig{
-				Enabled: GetEnvOrBool("KAFKA_CONSUMER_ENABLED", false),
+				Enabled: false,
 				Topics:  nil,
 			},
 			Producer: &KafkaProducerConfig{
-				Enabled: GetEnvOrBool("KAFKA_PRODUCER_ENABLED", false),
+				Enabled: false,
 			},
 			TLSDir: GetEnvOrString("KAFKA_TLS_DIR", ""),
 		},
 		Metrics: &MetricsConfig{
 			Enabled: GetEnvOrBool("METRICS_ENABLED", true),
 			Port:    GetEnvOrInt("METRICS_PORT", 51077),
+		},
+		Outbox: &OutboxConfig{
+			Enabled: false,
 		},
 		Sentry: &SentryConfig{
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
@@ -120,6 +129,20 @@ func Init(name string) *Service {
 
 // StartComponentsOption is an option to `StartComponents`.
 type StartComponentsOption func(*Service)
+
+// WithKafkaConsumer sets the Kafka consumer enabled flag.
+func WithKafkaConsumer() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.Kafka.Consumer.Enabled = true
+	}
+}
+
+// WithKafkaProducer sets the Kafka producer enabled flag.
+func WithKafkaProducer() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.Kafka.Producer.Enabled = true
+	}
+}
 
 // WithKafkaConsumerTopics sets the Kafka consumer topics.
 func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {

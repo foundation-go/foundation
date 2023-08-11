@@ -14,10 +14,6 @@ import (
 	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
-var (
-	OutboxEnabled = GetEnvOrBool("OUTBOX_ENABLED", false)
-)
-
 // Event represents an event to be published to the outbox
 type Event struct {
 	Topic     string
@@ -134,7 +130,7 @@ func (s *Service) publishEventToKafka(ctx context.Context, event *Event) Foundat
 func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
 	event = addDefaultHeaders(ctx, event)
 
-	if OutboxEnabled {
+	if s.Config.Outbox.Enabled {
 		return s.publishEventToOutbox(ctx, event, tx)
 	}
 
