@@ -1,15 +1,12 @@
 package gateway
 
 import (
-	"errors"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 
-	hydra "github.com/ory/hydra-client-go/v2"
-
 	fhttp "github.com/ri-nat/foundation/http"
+	fhydra "github.com/ri-nat/foundation/hydra"
 )
 
 // AuthenticationHandler is a function that authenticates the request
@@ -26,22 +23,7 @@ type AuthenticationResult struct {
 func WithHydraAuthenticationDetails(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		WithAuthenticationDetails(handler, func(token string) (*AuthenticationResult, error) {
-			hydraAdminURL := os.Getenv("HYDRA_ADMIN_URL")
-			if hydraAdminURL == "" {
-				return nil, errors.New("HYDRA_ADMIN_URL is not set")
-			}
-
-			// Create a new Hydra SDK client
-			config := hydra.NewConfiguration()
-			config.Servers = hydra.ServerConfigurations{
-				{URL: hydraAdminURL},
-			}
-			client := hydra.NewAPIClient(config)
-
-			// Authenticate the token using ORY Hydra
-			req := client.OAuth2Api.IntrospectOAuth2Token(r.Context())
-			req = req.Token(token)
-			resp, _, err := client.OAuth2Api.IntrospectOAuth2TokenExecute(req)
+			resp, err := fhydra.IntrospectedOAuth2Token(r.Context(), token)
 			if err != nil {
 				return nil, err
 			}

@@ -151,6 +151,13 @@ func WithKafkaConsumerTopics(topics ...string) StartComponentsOption {
 	}
 }
 
+// WithOutbox sets the outbox enabled flag.
+func WithOutbox() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.Outbox.Enabled = true
+	}
+}
+
 func (s *Service) addSystemComponents() error {
 	// Remove user-defined components in order to add system components first.
 	existedComponents := s.Components
