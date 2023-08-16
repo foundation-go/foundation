@@ -122,7 +122,7 @@ func (c *ConsumerComponent) Health() error {
 		return errors.New("reader is not initialized")
 	}
 
-	// TODO: find a way to check the health of the consumer. Maybe by adding the metadata fet
+	// TODO: find a way to check the health of the consumer.
 
 	return nil
 }
@@ -154,7 +154,7 @@ func WithProducerBrokers(brokers []string) ProducerComponentOption {
 // WithProducerLogger sets the logger for the ProducerComponent
 func WithProducerLogger(logger *logrus.Entry) ProducerComponentOption {
 	return func(c *ProducerComponent) {
-		c.logger = logger
+		c.logger = logger.WithField("component", ProducerComponentName)
 	}
 }
 

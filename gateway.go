@@ -55,7 +55,7 @@ func (s *Service) StartGateway(opts GatewayOptions) {
 	if err := s.StartComponents(); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
-		// TODO: Maybe flush sentry before exiting via Fatal?
+		// TODO: Maybe flush sentry before exiting via Fatal? Fix everywhere if so.
 		s.Logger.Fatal(err)
 	}
 

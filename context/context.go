@@ -5,19 +5,21 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	log "github.com/sirupsen/logrus"
 )
 
 type CtxKey string
 
 const (
-	CtxKeyCorrelationID CtxKey = "correlation_id"
-	CtxKeyClientID      CtxKey = "client_id"
-	CtxKeyUserID        CtxKey = "user_id"
 	CtxKeyAccessToken   CtxKey = "access_token"
-	CtxKeyauthenticated CtxKey = "authenticated"
+	CtxKeyAuthenticated CtxKey = "authenticated"
+	CtxKeyClientID      CtxKey = "client_id"
+	CtxKeyCorrelationID CtxKey = "correlation_id"
 	CtxKeyLogger        CtxKey = "logger"
+	CtxKeyRedis         CtxKey = "redis"
 	CtxKeyTX            CtxKey = "tx"
+	CtxKeyUserID        CtxKey = "user_id"
 )
 
 // GetCorrelationID returns the correlation ID from the context.
@@ -62,12 +64,12 @@ func SetAccessToken(ctx context.Context, accessToken string) context.Context {
 
 // GetAuthenticated returns the authenticated flag from the context.
 func GetAuthenticated(ctx context.Context) bool {
-	return ctx.Value(CtxKeyauthenticated).(bool)
+	return ctx.Value(CtxKeyAuthenticated).(bool)
 }
 
 // SetAuthenticated sets the authenticated flag in the context.
 func SetAuthenticated(ctx context.Context, authenticated bool) context.Context {
-	return context.WithValue(ctx, CtxKeyauthenticated, authenticated)
+	return context.WithValue(ctx, CtxKeyAuthenticated, authenticated)
 }
 
 // GetLogger returns the logger from the context.
@@ -88,4 +90,14 @@ func GetTX(ctx context.Context) *sql.Tx {
 // SetTX sets the transaction in the context.
 func SetTX(ctx context.Context, tx *sql.Tx) context.Context {
 	return context.WithValue(ctx, CtxKeyTX, tx)
+}
+
+// GetRedis returns the redis client from the context.
+func GetRedis(ctx context.Context) *redis.Client {
+	return ctx.Value(CtxKeyRedis).(*redis.Client)
+}
+
+// SetRedis sets the redis client in the context.
+func SetRedis(ctx context.Context, redis *redis.Client) context.Context {
+	return context.WithValue(ctx, CtxKeyRedis, redis)
 }

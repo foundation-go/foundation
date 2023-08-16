@@ -20,9 +20,10 @@ type EventHandler interface {
 
 // EventsWorkerOptions represents the options for starting an events worker
 type EventsWorkerOptions struct {
-	Handlers             map[string][]EventHandler
-	Topics               []string
-	KafkaProducerEnabled bool
+	Handlers               map[string][]EventHandler
+	Topics                 []string
+	ModeName               string
+	StartComponentsOptions []StartComponentsOption
 }
 
 func (opts *EventsWorkerOptions) GetTopics() []string {
@@ -68,16 +69,15 @@ func (opts *EventsWorkerOptions) GetTopics() []string {
 // StartEventsWorker starts a worker that handles events
 func (s *Service) StartEventsWorker(opts *EventsWorkerOptions) {
 	wOpts := NewWorkerOptions()
-	wOpts.ModeName = "events_worker"
+	wOpts.ModeName = opts.ModeName
+	if wOpts.ModeName == "" {
+		wOpts.ModeName = "events_worker"
+	}
 	wOpts.ProcessFunc = s.newProcessEventFunc(opts.Handlers)
-	wOpts.StartComponentsOptions = []StartComponentsOption{
+	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
-	}
-
-	if opts.KafkaProducerEnabled {
-		wOpts.StartComponentsOptions = append(wOpts.StartComponentsOptions, WithKafkaProducer())
-	}
+	)
 
 	s.StartWorker(wOpts)
 }
@@ -123,6 +123,8 @@ func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(c
 			if handleErr != nil {
 				// We just stop all the subsequent handlers from processing the event if one of them failed.
 				//
+				// TODO: Publish the errors to a separate topic for delivering them to the user.
+				//
 				// TODO: Consider adding a configuration option to allow the user to choose whether to stop after
 				// specific handler failed or not. It would require to add ability to return multiple errors from
 				// this function.
@@ -135,7 +137,7 @@ func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(c
 		// For now, we commit the message even if the handler failed to process it.
 		//
 		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
-		// Or maybe publish the message to a dead-letter topic.
+		// Or maybe even publish the message to a dead-letter topic?
 		if commitErr := s.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
 		}
@@ -163,8 +165,18 @@ func (s *Service) processEvent(ctx context.Context, handler EventHandler, event 
 		ctx = fctx.SetTX(ctx, tx)
 	}
 
+	if s.Config.Redis.Enabled {
+		// Add Redis client to context
+		ctx = fctx.SetRedis(ctx, s.GetRedis())
+	}
+
 	// Add correlation ID to context
 	ctx = fctx.SetCorrelationID(ctx, event.Headers[fkafka.HeaderCorrelationID])
+
+	// Add logger to context
+	//
+	// TODO: Maybe add the whole `*Service` to context instead of logger and redis separately?
+	ctx = fctx.SetLogger(ctx, s.Logger)
 
 	// Handle event
 	events, handleErr := handler.Handle(ctx, event)

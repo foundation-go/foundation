@@ -9,6 +9,7 @@ import (
 
 	fkafka "github.com/ri-nat/foundation/kafka"
 	fpg "github.com/ri-nat/foundation/postgresql"
+	fredis "github.com/ri-nat/foundation/redis"
 	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
@@ -31,6 +32,7 @@ type Config struct {
 	Kafka    *KafkaConfig
 	Metrics  *MetricsConfig
 	Outbox   *OutboxConfig
+	Redis    *RedisConfig
 	Sentry   *SentryConfig
 }
 
@@ -82,6 +84,12 @@ type OutboxConfig struct {
 	Enabled bool
 }
 
+// RedisConfig represents the configuration of a Redis client.
+type RedisConfig struct {
+	Enabled bool
+	URL     string
+}
+
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
@@ -110,6 +118,10 @@ func NewConfig() *Config {
 		},
 		Outbox: &OutboxConfig{
 			Enabled: false,
+		},
+		Redis: &RedisConfig{
+			Enabled: len(GetEnvOrString("REDIS_URL", "")) > 0,
+			URL:     GetEnvOrString("REDIS_URL", ""),
 		},
 		Sentry: &SentryConfig{
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
@@ -170,7 +182,7 @@ func (s *Service) addSystemComponents() error {
 
 	// PostgreSQL
 	if s.Config.Database.Enabled {
-		s.Components = append(s.Components, fpg.NewPostgreSQLComponent(
+		s.Components = append(s.Components, fpg.NewComponent(
 			fpg.WithDatabaseURL(s.Config.Database.URL),
 			fpg.WithLogger(s.Logger),
 			fpg.WithPoolSize(s.Config.Database.Pool),
@@ -203,6 +215,14 @@ func (s *Service) addSystemComponents() error {
 			WithMetricsServerHealthHandler(s.healthHandler),
 			WithMetricsServerLogger(s.Logger),
 			WithMetricsServerPort(s.Config.Metrics.Port),
+		))
+	}
+
+	// Redis
+	if s.Config.Redis.Enabled {
+		s.Components = append(s.Components, fredis.NewComponent(
+			fredis.WithLogger(s.Logger),
+			fredis.WithURL(s.Config.Redis.URL),
 		))
 	}
 
