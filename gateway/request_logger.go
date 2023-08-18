@@ -49,7 +49,7 @@ func WithRequestLogger(l *log.Entry) func(http.Handler) http.Handler {
 				"path":       request.URL.Path,
 				"request_id": requestID,
 			})
-			ctx := fctx.SetLogger(request.Context(), l)
+			ctx := fctx.WithLogger(request.Context(), l)
 			request = request.WithContext(ctx)
 
 			// Wrap the response writer with our logging response writer

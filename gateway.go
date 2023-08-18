@@ -21,10 +21,26 @@ const (
 	GatewayDefaultTimeout = 30 * time.Second
 )
 
+// Gateway represents a gateway mode Foundation service.
+type Gateway struct {
+	*Service
+}
+
+// InitGateway initializes a new Foundation service in Gateway mode.
+func InitGateway(name string) *Gateway {
+	if name == "" {
+		name = "gateway"
+	}
+
+	return &Gateway{
+		Service: Init(name),
+	}
+}
+
 // GatewayOptions represents the options for starting the Foundation gateway.
 type GatewayOptions struct {
 	// Services to register with the gateway
-	Services []gateway.Service
+	Services []*gateway.Service
 	// Timeout for downstream services requests (default: 30 seconds, if constructed with `NewGatewayOptions`)
 	Timeout time.Duration
 	// AuthenticationDetailsMiddleware is a middleware that populates the request context with authentication details.
@@ -38,14 +54,14 @@ type GatewayOptions struct {
 }
 
 // NewGatewayOptions returns a new GatewayOptions with default values.
-func NewGatewayOptions() GatewayOptions {
-	return GatewayOptions{
+func NewGatewayOptions() *GatewayOptions {
+	return &GatewayOptions{
 		Timeout: GatewayDefaultTimeout,
 	}
 }
 
-// StartGateway starts the Foundation gateway.
-func (s *Service) StartGateway(opts GatewayOptions) {
+// Start starts the Foundation gateway.
+func (s *Gateway) Start(opts *GatewayOptions) {
 	s.logStartup("gateway")
 
 	gw_runtime.DefaultContextTimeout = opts.Timeout
@@ -107,7 +123,7 @@ func (s *Service) StartGateway(opts GatewayOptions) {
 	s.Logger.Println("Service gracefully stopped")
 }
 
-func (s *Service) applyMiddleware(mux http.Handler, opts GatewayOptions) http.Handler {
+func (s *Service) applyMiddleware(mux http.Handler, opts *GatewayOptions) http.Handler {
 	var middleware []func(http.Handler) http.Handler
 
 	// General middleware

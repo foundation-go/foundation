@@ -28,7 +28,7 @@ func TestErrorHandler(t *testing.T) {
 
 	internalError := status.Error(codes.Internal, "private error")
 	ctx := context.Background()
-	req = req.WithContext(fctx.SetLogger(ctx, logrus.NewEntry(logrus.New())))
+	req = req.WithContext(fctx.WithLogger(ctx, logrus.NewEntry(logrus.New())))
 
 	ErrorHandler(ctx, mux, marshaler, w, req, internalError)
 

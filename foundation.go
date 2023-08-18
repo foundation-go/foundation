@@ -27,13 +27,14 @@ type Service struct {
 
 // Config represents the configuration of a Service.
 type Config struct {
-	Database *DatabaseConfig
-	GRPC     *GRPCConfig
-	Kafka    *KafkaConfig
-	Metrics  *MetricsConfig
-	Outbox   *OutboxConfig
-	Redis    *RedisConfig
-	Sentry   *SentryConfig
+	Database     *DatabaseConfig
+	EventsWorker *EventsWorkerConfig
+	GRPC         *GRPCConfig
+	Kafka        *KafkaConfig
+	Metrics      *MetricsConfig
+	Outbox       *OutboxConfig
+	Redis        *RedisConfig
+	Sentry       *SentryConfig
 }
 
 // DatabaseConfig represents the configuration of a PostgreSQL database.
@@ -41,6 +42,18 @@ type DatabaseConfig struct {
 	Enabled bool
 	Pool    int
 	URL     string
+}
+
+// EventsWorkerConfig represents the configuration of an event bus.
+type EventsWorkerConfig struct {
+	// ErrorsTopic is the name of the Kafka topic to which errors from the
+	// events worker handlers should be published.
+	ErrorsTopic string
+
+	// DeliverErrors determines whether errors from events worker handlers
+	// should be published to the errors topic (and thus, delivered
+	// to originator, aka user) or not.
+	DeliverErrors bool
 }
 
 // GRPCConfig represents the configuration of a gRPC server.
@@ -97,6 +110,10 @@ func NewConfig() *Config {
 			Enabled: len(GetEnvOrString("DATABASE_URL", "")) > 0,
 			Pool:    GetEnvOrInt("DATABASE_POOL", 5),
 			URL:     GetEnvOrString("DATABASE_URL", ""),
+		},
+		EventsWorker: &EventsWorkerConfig{
+			ErrorsTopic:   GetEnvOrString("EVENTS_WORKER_ERRORS_TOPIC", "foundation.events_worker.errors"),
+			DeliverErrors: GetEnvOrBool("EVENTS_WORKER_DELIVER_ERRORS", true),
 		},
 		GRPC: &GRPCConfig{
 			TLSDir: GetEnvOrString("GRPC_TLS_DIR", ""),

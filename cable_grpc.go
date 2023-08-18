@@ -14,6 +14,22 @@ import (
 	"google.golang.org/grpc"
 )
 
+// CableGRPC is a Foundation service in AnyCable gRPC Server mode.
+type CableGRPC struct {
+	*Service
+}
+
+// InitCableGRPC initializes a Foundation service in AnyCable gRPC Server mode.
+func InitCableGRPC(name string) *CableGRPC {
+	if name == "" {
+		name = "cable_grpc"
+	}
+
+	return &CableGRPC{
+		Service: Init(name),
+	}
+}
+
 // CableGRPCOptions are the options to start a Foundation service in gRPC Server mode.
 type CableGRPCOptions struct {
 	// GRPCServerOptions are the gRPC server options to use.
@@ -31,12 +47,12 @@ type CableGRPCOptions struct {
 	AuthenticationFunc cable_grpc.AuthenticationFunc
 }
 
-func NewCableGRPCOptions() CableGRPCOptions {
-	return CableGRPCOptions{}
+func NewCableGRPCOptions() *CableGRPCOptions {
+	return &CableGRPCOptions{}
 }
 
 // StartCableGRPC starts a Foundation as an AnyCable-compartible gRPC server.
-func (s *Service) StartCableGRPC(opts CableGRPCOptions) {
+func (s *CableGRPC) Start(opts *CableGRPCOptions) {
 	s.logStartup("cable_grpc")
 
 	// Start common components

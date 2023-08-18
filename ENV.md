@@ -20,6 +20,16 @@ The following environment variables are only applicable when running in `gateway
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service. E.g. `GRPC_USERS_ENDPOINT` for the `users` service.
 
+## Events Worker
+
+The following environment variables are only applicable when running in `events_worker` mode.
+
+> Note: Do not forget to add the `cable_courier` service to your application in order to deliver events
+> to the originators (users) via WebSockets.
+
+- `EVENTS_WORKER_ERRORS_TOPIC`: The Kafka topic to publish errors to. Default: `foundation.events_worker.errors`.
+- `EVENTS_WORKER_DELIVER_ERRORS`: Whether to deliver errors to the `EVENTS_WORKER_ERRORS_TOPIC`. Default: `true`.
+
 ## gRPC
 
 - `GRPC_TLS_DIR`: The directory containing the TLS certificates for gRPC. Leave empty to disable TLS.

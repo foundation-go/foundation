@@ -43,7 +43,7 @@ func NewEventFromProto(msg proto.Message, key string, headers map[string]string)
 	// Get proto name
 	protoName := string(msg.ProtoReflect().Descriptor().FullName())
 	// Construct topic name from proto name
-	topic := protoNameToTopic(protoName)
+	topic := ProtoNameToTopic(protoName)
 
 	if headers == nil {
 		headers = make(map[string]string)
@@ -201,9 +201,19 @@ func (s *Service) DeleteOutboxEvents(ctx context.Context, maxID int64) Foundatio
 	return nil
 }
 
-func protoNameToTopic(protoName string) string {
+// TODO: extract these functions to a more appropriate place
+func ProtoNameToTopic(protoName string) string {
+	// TODO: Respect `EVENTS_WORKER_ERRORS_TOPIC` for Foundation errors
 	topicParts := strings.Split(protoName, ".")
 	topicParts = topicParts[:len(topicParts)-1]
 
 	return strings.Join(topicParts, ".")
+}
+
+func ProtoToTopic(msg proto.Message) string {
+	return ProtoNameToTopic(ProtoToName(msg))
+}
+
+func ProtoToName(msg proto.Message) string {
+	return string(msg.ProtoReflect().Descriptor().FullName())
 }

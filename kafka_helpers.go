@@ -62,11 +62,3 @@ func (s *Service) GetKafkaProducer() *kafka.Writer {
 
 	return producer.Producer
 }
-
-func (s *Service) getKafkaBrokers() ([]string, error) {
-	if len(s.Config.Kafka.Brokers) == 0 {
-		return nil, errors.New("KAFKA_BROKERS variable is not set")
-	}
-
-	return s.Config.Kafka.Brokers, nil
-}

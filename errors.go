@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
@@ -10,6 +11,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+
+	ferr "github.com/ri-nat/foundation/errors"
 )
 
 // BaseError is the base error type for all errors in the Foundation framework.
@@ -25,6 +29,8 @@ func (e *BaseError) Error() string {
 type FoundationError interface {
 	error
 	GRPCStatus() *status.Status
+	MarshalProto() proto.Message
+	MarshalJSON() ([]byte, error)
 }
 
 // GRPCStatus returns a gRPC status error for the Foundation error.
@@ -39,6 +45,15 @@ type InternalError struct {
 
 func (e *InternalError) GRPCStatus() *status.Status {
 	return status.New(codes.Internal, "internal error")
+}
+
+// MarshalProto marshals the error to a proto.Message.
+func (e *InternalError) MarshalProto() proto.Message {
+	return &ferr.InternalError{}
+}
+
+func (e *InternalError) MarshalJSON() ([]byte, error) {
+	return []byte("{}"), nil
 }
 
 // NewInternalError creates a generic internal error.
@@ -86,6 +101,30 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 	return st
 }
 
+// MarshalProto marshals the error to a proto.Message.
+func (e *InvalidArgumentError) MarshalProto() proto.Message {
+	err := &ferr.InvalidArgumentError{
+		Kind: e.Kind,
+		Id:   e.ID,
+	}
+
+	for field, description := range e.Violations {
+		for _, d := range description {
+			err.Violations = append(err.Violations, &ferr.InvalidArgumentError_Violation{
+				Field:       field,
+				Description: d,
+			})
+		}
+	}
+
+	return err
+}
+
+// MarshalJSON marshals the error to JSON.
+func (e *InvalidArgumentError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.MarshalProto())
+}
+
 // NewInvalidArgumentError creates an invalid argument error with error details.
 func NewInvalidArgumentError(kind string, id string, violations map[string][]string) *InvalidArgumentError {
 	return &InvalidArgumentError{
@@ -112,6 +151,19 @@ func (e *NotFoundError) GRPCStatus() *status.Status {
 	return status.New(codes.NotFound, msg)
 }
 
+// MarshalProto marshals the error to a proto.Message.
+func (e *NotFoundError) MarshalProto() proto.Message {
+	return &ferr.NotFoundError{
+		Kind: e.Kind,
+		Id:   e.ID,
+	}
+}
+
+// MarshalJSON marshals the error to JSON.
+func (e *NotFoundError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.MarshalProto())
+}
+
 // NewNotFoundError creates a not found error.
 func NewNotFoundError(err error, kind string, id string) *NotFoundError {
 	return &NotFoundError{
@@ -136,6 +188,20 @@ func (e *PermissionDeniedError) GRPCStatus() *status.Status {
 	return status.New(codes.PermissionDenied, e.Err.Error())
 }
 
+// MarshalProto marshals the error to a proto.Message.
+func (e *PermissionDeniedError) MarshalProto() proto.Message {
+	return &ferr.PermissionDeniedError{
+		Action: e.Action,
+		Kind:   e.Kind,
+		Id:     e.ID,
+	}
+}
+
+// MarshalJSON marshals the error to JSON.
+func (e *PermissionDeniedError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.MarshalProto())
+}
+
 // NewPermissionDeniedError creates a permission denied error.
 func NewPermissionDeniedError(action string, kind string, id string) *PermissionDeniedError {
 	err := fmt.Errorf("permission denied: `%s` on %s/%s", action, kind, id)
@@ -157,6 +223,16 @@ type UnauthenticatedError struct {
 
 func (e *UnauthenticatedError) GRPCStatus() *status.Status {
 	return status.New(codes.Unauthenticated, e.Err.Error())
+}
+
+// MarshalProto marshals the error to a proto.Message.
+func (e *UnauthenticatedError) MarshalProto() proto.Message {
+	return &ferr.UnauthenticatedError{}
+}
+
+// MarshalJSON marshals the error to JSON.
+func (e *UnauthenticatedError) MarshalJSON() ([]byte, error) {
+	return []byte("{}"), nil
 }
 
 // NewUnauthenticatedError creates an unauthenticated error.
@@ -198,6 +274,21 @@ func (e *StaleObjectError) GRPCStatus() *status.Status {
 	}
 
 	return st
+}
+
+// MarshalProto marshals the error to a proto.Message.
+func (e *StaleObjectError) MarshalProto() proto.Message {
+	return &ferr.StaleObjectError{
+		Kind:            e.Kind,
+		Id:              e.ID,
+		ActualVersion:   e.ActualVersion,
+		ExpectedVersion: e.ExpectedVersion,
+	}
+}
+
+// MarshalJSON marshals the error to JSON.
+func (e *StaleObjectError) MarshalJSON() ([]byte, error) {
+	return json.Marshal(e.MarshalProto())
 }
 
 // NewStaleObjectError creates a stale object error.

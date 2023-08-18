@@ -14,6 +14,22 @@ const (
 	WorkerDefaultInterval = 5 * time.Millisecond
 )
 
+// Worker is a type of Foundation service.
+type Worker struct {
+	*Service
+}
+
+// InitWorker initializes a new Foundation service in worker mode.
+func InitWorker(name string) *Worker {
+	if name == "" {
+		name = "worker"
+	}
+
+	return &Worker{
+		Init(name),
+	}
+}
+
 // WorkerOptions are the options to start a Foundation service in worker mode.
 type WorkerOptions struct {
 	// ProcessFunc is the function to execute in the loop iteration.
@@ -32,22 +48,22 @@ type WorkerOptions struct {
 }
 
 // NewWorkerOptions returns a new WorkerOptions instance with default values.
-func NewWorkerOptions() WorkerOptions {
-	return WorkerOptions{
+func NewWorkerOptions() *WorkerOptions {
+	return &WorkerOptions{
 		ModeName: "worker",
 		Interval: WorkerDefaultInterval,
 	}
 }
 
-// StartWorker starts a Foundation service in worker mode.
-func (s *Service) StartWorker(opts WorkerOptions) {
-	s.logStartup(opts.ModeName)
+// Start starts a Foundation worker
+func (w *Worker) Start(opts *WorkerOptions) {
+	w.logStartup(opts.ModeName)
 
 	// Start common components
-	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
+	if err := w.StartComponents(opts.StartComponentsOptions...); err != nil {
 		err = fmt.Errorf("failed to start components: %w", err)
 		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		w.Logger.Fatal(err)
 	}
 
 	// Watch for termination signals
@@ -65,7 +81,7 @@ func (s *Service) StartWorker(opts WorkerOptions) {
 				started := time.Now()
 
 				if err := opts.ProcessFunc(ctx); err != nil {
-					s.HandleError(err, "failed to process iteration")
+					w.HandleError(err, "failed to process iteration")
 				}
 
 				// Sleep for the remaining time of the interval
@@ -78,9 +94,9 @@ func (s *Service) StartWorker(opts WorkerOptions) {
 
 	<-ctx.Done()
 
-	s.Logger.Info("Shutting down service...")
+	w.Logger.Info("Shutting down service...")
 
-	s.StopComponents()
+	w.StopComponents()
 
-	s.Logger.Info("Service gracefully stopped")
+	w.Logger.Info("Service gracefully stopped")
 }

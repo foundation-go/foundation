@@ -11,19 +11,36 @@ import (
 	fctx "github.com/ri-nat/foundation/context"
 	fkafka "github.com/ri-nat/foundation/kafka"
 	"github.com/segmentio/kafka-go"
+	"google.golang.org/protobuf/proto"
 )
+
+type EventsWorker struct {
+	*Worker
+
+	protoNamesToMessages map[string]proto.Message
+}
 
 // EventHandler represents an event handler
 type EventHandler interface {
-	Handle(ctx context.Context, event *Event) ([]*Event, FoundationError)
+	Handle(context.Context, *Event, proto.Message) ([]*Event, FoundationError)
 }
 
 // EventsWorkerOptions represents the options for starting an events worker
 type EventsWorkerOptions struct {
-	Handlers               map[string][]EventHandler
+	Handlers               map[proto.Message][]EventHandler
 	Topics                 []string
 	ModeName               string
 	StartComponentsOptions []StartComponentsOption
+}
+
+func InitEventsWorker(name string) *EventsWorker {
+	if name == "" {
+		name = "events_worker"
+	}
+
+	return &EventsWorker{
+		Worker: InitWorker(name),
+	}
 }
 
 func (opts *EventsWorkerOptions) GetTopics() []string {
@@ -39,7 +56,8 @@ func (opts *EventsWorkerOptions) GetTopics() []string {
 		return nil
 	}
 
-	for protoName := range opts.Handlers {
+	for protoMsg := range opts.Handlers {
+		protoName := ProtoToName(protoMsg)
 		// Collect service names from event message names
 		// project.service.SomeEvent -> project.service
 		topic := protoName[:strings.LastIndex(protoName, ".")]
@@ -66,20 +84,30 @@ func (opts *EventsWorkerOptions) GetTopics() []string {
 	return topics
 }
 
+func (opts *EventsWorkerOptions) ProtoNamesToMessages() map[string]proto.Message {
+	protoNamesToMessages := make(map[string]proto.Message)
+
+	for msg := range opts.Handlers {
+		protoNamesToMessages[ProtoToName(msg)] = msg
+	}
+
+	return protoNamesToMessages
+}
+
 // StartEventsWorker starts a worker that handles events
-func (s *Service) StartEventsWorker(opts *EventsWorkerOptions) {
+func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 	wOpts := NewWorkerOptions()
 	wOpts.ModeName = opts.ModeName
 	if wOpts.ModeName == "" {
 		wOpts.ModeName = "events_worker"
 	}
-	wOpts.ProcessFunc = s.newProcessEventFunc(opts.Handlers)
+	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
 	)
 
-	s.StartWorker(wOpts)
+	w.Worker.Start(wOpts)
 }
 
 func newEventFromKafkaMessage(msg *kafka.Message) *Event {
@@ -98,9 +126,9 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(ctx context.Context) FoundationError {
+func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHandler) func(ctx context.Context) FoundationError {
 	return func(ctx context.Context) FoundationError {
-		msg, err := s.GetKafkaConsumer().FetchMessage(ctx)
+		msg, err := w.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
 			return NewInternalError(err, "failed to read message from Kafka")
 		}
@@ -109,21 +137,35 @@ func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(c
 
 		var handleErr FoundationError
 
-		log := s.Logger.WithFields(map[string]interface{}{
+		log := w.Logger.WithFields(map[string]interface{}{
 			"correlation_id": event.Headers[fkafka.HeaderCorrelationID],
 			"event":          event.ProtoName,
 		})
 		log.Info("Received event")
 
-		for _, handler := range handlers[event.ProtoName] {
+		// Add explicit handlers
+		protoMsg := Clone(w.protoNamesToMessages[event.ProtoName]).(proto.Message)
+		curHandlers := handlers[protoMsg]
+		err = proto.Unmarshal(event.Payload, protoMsg)
+		if err != nil {
+			return NewInternalError(err, "failed to unmarshal event payload")
+		}
+
+		for _, handler := range curHandlers {
 			log := log.WithField("handler", fmt.Sprintf("%T", handler))
 			log.Info("Processing event")
 
-			handleErr = s.processEvent(ctx, handler, event)
+			handleErr = w.processEvent(ctx, handler, event, protoMsg)
 			if handleErr != nil {
+				// We publish the error event to the error topic for further delivery to the user via WebSocket.
+				if event.Headers[fkafka.HeaderOriginatorID] != "" {
+					err := w.NewAndPublishEvent(ctx, handleErr.MarshalProto(), event.Headers[fkafka.HeaderOriginatorID], nil, nil)
+					if err != nil {
+						return err
+					}
+				}
+
 				// We just stop all the subsequent handlers from processing the event if one of them failed.
-				//
-				// TODO: Publish the errors to a separate topic for delivering them to the user.
 				//
 				// TODO: Consider adding a configuration option to allow the user to choose whether to stop after
 				// specific handler failed or not. It would require to add ability to return multiple errors from
@@ -138,7 +180,7 @@ func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(c
 		//
 		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
 		// Or maybe even publish the message to a dead-letter topic?
-		if commitErr := s.CommitMessage(ctx, msg); commitErr != nil {
+		if commitErr := w.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
 		}
 
@@ -146,15 +188,15 @@ func (s *Service) newProcessEventFunc(handlers map[string][]EventHandler) func(c
 	}
 }
 
-func (s *Service) processEvent(ctx context.Context, handler EventHandler, event *Event) FoundationError {
+func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, event *Event, msg proto.Message) FoundationError {
 	var (
 		tx         *sql.Tx
 		needCommit bool
 		err        error
 	)
 
-	if s.Config.Database.Enabled {
-		tx, err = s.GetPostgreSQL().Begin()
+	if w.Config.Database.Enabled {
+		tx, err = w.GetPostgreSQL().Begin()
 		if err != nil {
 			return NewInternalError(err, "failed to begin transaction")
 		}
@@ -162,31 +204,21 @@ func (s *Service) processEvent(ctx context.Context, handler EventHandler, event 
 		needCommit = true
 
 		// Add transaction to context
-		ctx = fctx.SetTX(ctx, tx)
-	}
-
-	if s.Config.Redis.Enabled {
-		// Add Redis client to context
-		ctx = fctx.SetRedis(ctx, s.GetRedis())
+		ctx = fctx.WithTX(ctx, tx)
 	}
 
 	// Add correlation ID to context
-	ctx = fctx.SetCorrelationID(ctx, event.Headers[fkafka.HeaderCorrelationID])
-
-	// Add logger to context
-	//
-	// TODO: Maybe add the whole `*Service` to context instead of logger and redis separately?
-	ctx = fctx.SetLogger(ctx, s.Logger)
+	ctx = fctx.WithCorrelationID(ctx, event.Headers[fkafka.HeaderCorrelationID])
 
 	// Handle event
-	events, handleErr := handler.Handle(ctx, event)
+	events, handleErr := handler.Handle(ctx, event, msg)
 	if handleErr != nil {
 		return handleErr
 	}
 
 	// Publish outgoing events
 	for _, e := range events {
-		if publishErr := s.PublishEvent(ctx, e, tx); publishErr != nil {
+		if publishErr := w.PublishEvent(ctx, e, tx); publishErr != nil {
 			return publishErr
 		}
 	}

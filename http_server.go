@@ -10,7 +10,23 @@ import (
 	"github.com/getsentry/sentry-go"
 )
 
-// HTTPServerOptions are the options to start a Foundation service in server mode.
+// HTTPServer represents a HTTP Server mode Foundation service.
+type HTTPServer struct {
+	*Service
+}
+
+// InitHTTPServer initializes a new Foundation service in HTTP Server mode.
+func InitHTTPServer(name string) *HTTPServer {
+	if name == "" {
+		name = "http_server"
+	}
+
+	return &HTTPServer{
+		Init(name),
+	}
+}
+
+// HTTPServerOptions are the options to start a Foundation service in HTTP Server mode.
 type HTTPServerOptions struct {
 	// Handler is the HTTP handler to use.
 	Handler http.Handler
@@ -19,12 +35,12 @@ type HTTPServerOptions struct {
 	StartComponentsOptions []StartComponentsOption
 }
 
-func NewHTTPServerOptions() HTTPServerOptions {
-	return HTTPServerOptions{}
+func NewHTTPServerOptions() *HTTPServerOptions {
+	return &HTTPServerOptions{}
 }
 
-// StartHTTPServer starts a Foundation service in HTTP Server mode.
-func (s *Service) StartHTTPServer(opts HTTPServerOptions) {
+// Start starts a Foundation service in HTTP Server mode.
+func (s *HTTPServer) Start(opts *HTTPServerOptions) {
 	s.logStartup("http")
 
 	// Start common components

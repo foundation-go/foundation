@@ -13,6 +13,22 @@ import (
 	"google.golang.org/grpc"
 )
 
+// GRPCServer represents a gRPC server mode Foundation service.
+type GRPCServer struct {
+	*Service
+}
+
+// InitGRPCServer initializes a new Foundation service in gRPC Server mode.
+func InitGRPCServer(name string) *GRPCServer {
+	if name == "" {
+		name = "grpc"
+	}
+
+	return &GRPCServer{
+		Service: Init(name),
+	}
+}
+
 // GRPCServerOptions are the options to start a Foundation service in gRPC Server mode.
 type GRPCServerOptions struct {
 	// RegisterFunc is a function that registers the gRPC server implementation.
@@ -25,12 +41,12 @@ type GRPCServerOptions struct {
 	StartComponentsOptions []StartComponentsOption
 }
 
-func NewGRPCServerOptions() GRPCServerOptions {
-	return GRPCServerOptions{}
+func NewGRPCServerOptions() *GRPCServerOptions {
+	return &GRPCServerOptions{}
 }
 
-// StartGRPCServer starts a Foundation service in gRPC server mode.
-func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
+// Start starts a Foundation service in gRPC server mode.
+func (s *GRPCServer) Start(opts *GRPCServerOptions) {
 	s.logStartup("grpc")
 
 	// Start common components
