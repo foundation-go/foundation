@@ -3,8 +3,6 @@ package foundation
 import (
 	"context"
 	"fmt"
-	"os/signal"
-	"syscall"
 
 	"github.com/getsentry/sentry-go"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -17,14 +15,12 @@ import (
 // CableGRPC is a Foundation service in AnyCable gRPC Server mode.
 type CableGRPC struct {
 	*Service
+
+	Options *CableGRPCOptions
 }
 
 // InitCableGRPC initializes a Foundation service in AnyCable gRPC Server mode.
 func InitCableGRPC(name string) *CableGRPC {
-	if name == "" {
-		name = "cable_grpc"
-	}
-
 	return &CableGRPC{
 		Service: Init(name),
 	}
@@ -51,37 +47,37 @@ func NewCableGRPCOptions() *CableGRPCOptions {
 	return &CableGRPCOptions{}
 }
 
-// StartCableGRPC starts a Foundation as an AnyCable-compartible gRPC server.
+// Start starts a Foundation as an AnyCable-compartible gRPC server.
 func (s *CableGRPC) Start(opts *CableGRPCOptions) {
-	s.logStartup("cable_grpc")
+	s.Options = opts
 
-	// Start common components
-	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatalf("Failed to start components: %v", err)
+	startOpts := &StartOptions{
+		ModeName:               "cable_grpc",
+		StartComponentsOptions: s.Options.StartComponentsOptions,
+		ServiceFunc:            s.ServiceFunc,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+	s.Service.Start(startOpts)
+}
 
+func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	// Default interceptors
 	//
-	// TODO: Work correctly with interceptors from options
+	// TODO: Work correctly with interceptors from s.Options
 	interceptors := []grpc.UnaryServerInterceptor{
 		fg.LoggingInterceptor(s.Logger),
 	}
 	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
-	opts.GRPCServerOptions = append(opts.GRPCServerOptions, chainedInterceptor)
+	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
 
 	// Start the server
 	listener := s.aquireListener()
-	server := grpc.NewServer(opts.GRPCServerOptions...)
+	server := grpc.NewServer(s.Options.GRPCServerOptions...)
 
 	pb.RegisterRPCServer(server, &cable_grpc.Server{
-		Channels:           opts.Channels,
-		WithAuthentication: opts.WithAuthentication,
-		AuthenticationFunc: opts.AuthenticationFunc,
+		Channels:           s.Options.Channels,
+		WithAuthentication: s.Options.WithAuthentication,
+		AuthenticationFunc: s.Options.AuthenticationFunc,
 		Logger:             s.Logger,
 	})
 
@@ -94,11 +90,7 @@ func (s *CableGRPC) Start(opts *CableGRPCOptions) {
 	}()
 
 	<-ctx.Done()
-	s.Logger.Println("Shutting down service...")
-
-	// Gracefully stop the server
 	server.GracefulStop()
-	s.StopComponents()
 
-	s.Logger.Println("Service gracefully stopped")
+	return nil
 }

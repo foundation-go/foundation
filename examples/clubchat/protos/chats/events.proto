@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package foundation.examples.clubchat.chats;
+
+import "examples/clubchat/protos/chats/objects.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package =
+  "github.com/ri-nat/foundation/examples/clubchat/protos/chats";
+
+message MessageSentEvent {
+  Message message = 1;
+
+  google.protobuf.Timestamp happened_at = 2;
+}

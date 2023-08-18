@@ -34,10 +34,6 @@ type EventsWorkerOptions struct {
 }
 
 func InitEventsWorker(name string) *EventsWorker {
-	if name == "" {
-		name = "events_worker"
-	}
-
 	return &EventsWorker{
 		Worker: InitWorker(name),
 	}
@@ -94,13 +90,10 @@ func (opts *EventsWorkerOptions) ProtoNamesToMessages() map[string]proto.Message
 	return protoNamesToMessages
 }
 
-// StartEventsWorker starts a worker that handles events
+// Start starts a worker that handles events
 func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 	wOpts := NewWorkerOptions()
 	wOpts.ModeName = opts.ModeName
-	if wOpts.ModeName == "" {
-		wOpts.ModeName = "events_worker"
-	}
 	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),

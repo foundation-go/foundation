@@ -23,5 +23,5 @@ func main() {
 }
 
 func resolveMessageSent(ctx context.Context, event *f.Event, msg proto.Message) (string, error) {
-	return fmt.Sprintf("chats:%s", msg.(*cpb.MessageSentEvent).ChatId), nil
+	return fmt.Sprintf("chats:%s", msg.(*cpb.MessageSentEvent).Message.ChatId), nil
 }

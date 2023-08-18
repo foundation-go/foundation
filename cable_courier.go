@@ -23,10 +23,6 @@ type CableCourier struct {
 
 // InitCableCourier initializes a new CableCourier.
 func InitCableCourier(name string) *CableCourier {
-	if name == "" {
-		name = "cable_courier"
-	}
-
 	return &CableCourier{
 		EventsWorker: InitEventsWorker(name),
 	}

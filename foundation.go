@@ -1,8 +1,11 @@
 package foundation
 
 import (
+	"context"
 	"fmt"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
@@ -21,6 +24,7 @@ type Service struct {
 	Name       string
 	Config     *Config
 	Components []Component
+	ModeName   string
 
 	Logger *logrus.Entry
 }
@@ -287,4 +291,45 @@ func (s *Service) StopComponents() {
 			s.Logger.Error(err)
 		}
 	}
+}
+
+type StartOptions struct {
+	ModeName               string
+	StartComponentsOptions []StartComponentsOption
+	ServiceFunc            func(ctx context.Context) error
+}
+
+// Start starts the Foundation service.
+func (s *Service) Start(opts *StartOptions) {
+	s.ModeName = opts.ModeName
+
+	// Set running mode to logger
+	s.Logger = s.Logger.WithField("mode", s.ModeName)
+
+	// Log application startup
+	s.logStartup()
+
+	// Start common components
+	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
+		s.Logger.Fatalf("Failed to start components: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Run the actual service code
+	if err := opts.ServiceFunc(ctx); err != nil {
+		err = fmt.Errorf("failed to start service: %w", err)
+		sentry.CaptureException(err)
+		s.Logger.Fatalf("Failed to start service: %v", err)
+	}
+
+	<-ctx.Done()
+	s.Logger.Println("Shutting down service...")
+
+	s.StopComponents()
+
+	s.Logger.Println("Service gracefully stopped")
 }

@@ -55,7 +55,7 @@ Foundation comes with built-in support for:
 
 ## 🚀 Getting Started
 
-Currently, the best way to get started is by exploring the codebase. We're working on providing sample implementations and thorough documentation to make the onboarding process even smoother. Stay tuned!
+Currently, the best way to get started is by exploring the [examples](./examples) directory. There is an example application called `clubchat` that demonstrates how to use Foundation to create a simple event-driven microservices application.
 
 ## 🖥️ CLI Tool
 

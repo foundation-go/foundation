@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os/signal"
-	"syscall"
 
 	"github.com/getsentry/sentry-go"
 )
@@ -13,16 +11,15 @@ import (
 // HTTPServer represents a HTTP Server mode Foundation service.
 type HTTPServer struct {
 	*Service
+
+	Options *HTTPServerOptions
 }
 
 // InitHTTPServer initializes a new Foundation service in HTTP Server mode.
 func InitHTTPServer(name string) *HTTPServer {
-	if name == "" {
-		name = "http_server"
-	}
-
 	return &HTTPServer{
 		Init(name),
+		NewHTTPServerOptions(),
 	}
 }
 
@@ -41,22 +38,20 @@ func NewHTTPServerOptions() *HTTPServerOptions {
 
 // Start starts a Foundation service in HTTP Server mode.
 func (s *HTTPServer) Start(opts *HTTPServerOptions) {
-	s.logStartup("http")
+	s.Options = opts
 
-	// Start common components
-	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
-	}
+	s.Service.Start(&StartOptions{
+		ModeName:               "http_server",
+		StartComponentsOptions: s.Options.StartComponentsOptions,
+		ServiceFunc:            s.ServiceFunc,
+	})
+}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
+func (s *HTTPServer) ServiceFunc(ctx context.Context) error {
 	port := GetEnvOrInt("PORT", 51051)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: opts.Handler,
+		Handler: s.Options.Handler,
 	}
 
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
@@ -70,7 +65,6 @@ func (s *HTTPServer) Start(opts *HTTPServerOptions) {
 	}()
 
 	<-ctx.Done()
-	s.Logger.Println("Shutting down service...")
 
 	// Gracefully stop the HTTP server
 	if err := server.Shutdown(context.Background()); err != nil {
@@ -79,7 +73,5 @@ func (s *HTTPServer) Start(opts *HTTPServerOptions) {
 		s.Logger.Fatal(err)
 	}
 
-	s.StopComponents()
-
-	s.Logger.Println("Service gracefully stopped")
+	return nil
 }

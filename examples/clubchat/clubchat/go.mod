@@ -1,4 +1,4 @@
-module github.com/ri-nat/foundation/examples/fanclub/fanclub
+module github.com/ri-nat/foundation/examples/clubchat/clubchat
 
 go 1.21
 

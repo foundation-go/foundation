@@ -2,12 +2,7 @@ package foundation
 
 import (
 	"context"
-	"fmt"
-	"os/signal"
-	"syscall"
 	"time"
-
-	"github.com/getsentry/sentry-go"
 )
 
 const (
@@ -17,16 +12,15 @@ const (
 // Worker is a type of Foundation service.
 type Worker struct {
 	*Service
+
+	Options *WorkerOptions
 }
 
 // InitWorker initializes a new Foundation service in worker mode.
 func InitWorker(name string) *Worker {
-	if name == "" {
-		name = "worker"
-	}
-
 	return &Worker{
 		Init(name),
+		NewWorkerOptions(),
 	}
 }
 
@@ -57,20 +51,17 @@ func NewWorkerOptions() *WorkerOptions {
 
 // Start starts a Foundation worker
 func (w *Worker) Start(opts *WorkerOptions) {
-	w.logStartup(opts.ModeName)
+	w.Options = opts
 
-	// Start common components
-	if err := w.StartComponents(opts.StartComponentsOptions...); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		w.Logger.Fatal(err)
-	}
+	w.Service.Start(&StartOptions{
+		ModeName:               opts.ModeName,
+		StartComponentsOptions: w.Options.StartComponentsOptions,
+		ServiceFunc:            w.ServiceFunc,
+	})
+}
 
-	// Watch for termination signals
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// Run the iteration function in a loop until the service is stopped
+// ServiceFunc is the default service function for a worker.
+func (w *Worker) ServiceFunc(ctx context.Context) error {
 	go func() {
 	Loop:
 		for {
@@ -80,13 +71,13 @@ func (w *Worker) Start(opts *WorkerOptions) {
 			default:
 				started := time.Now()
 
-				if err := opts.ProcessFunc(ctx); err != nil {
+				if err := w.Options.ProcessFunc(ctx); err != nil {
 					w.HandleError(err, "failed to process iteration")
 				}
 
 				// Sleep for the remaining time of the interval
-				if opts.Interval > 0 {
-					time.Sleep(opts.Interval - time.Since(started))
+				if w.Options.Interval > 0 {
+					time.Sleep(w.Options.Interval - time.Since(started))
 				}
 			}
 		}
@@ -94,9 +85,5 @@ func (w *Worker) Start(opts *WorkerOptions) {
 
 	<-ctx.Done()
 
-	w.Logger.Info("Shutting down service...")
-
-	w.StopComponents()
-
-	w.Logger.Info("Service gracefully stopped")
+	return nil
 }

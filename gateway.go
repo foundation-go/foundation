@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os/signal"
 	"reflect"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -24,14 +22,12 @@ const (
 // Gateway represents a gateway mode Foundation service.
 type Gateway struct {
 	*Service
+
+	Options *GatewayOptions
 }
 
 // InitGateway initializes a new Foundation service in Gateway mode.
 func InitGateway(name string) *Gateway {
-	if name == "" {
-		name = "gateway"
-	}
-
 	return &Gateway{
 		Service: Init(name),
 	}
@@ -51,6 +47,8 @@ type GatewayOptions struct {
 	AuthenticationExcept []string
 	// Middleware is a list of middleware to apply to the gateway. The middleware is applied in the order it is defined.
 	Middleware []func(http.Handler) http.Handler
+	// StartComponentsOptions are the options to start the components.
+	StartComponentsOptions []StartComponentsOption
 }
 
 // NewGatewayOptions returns a new GatewayOptions with default values.
@@ -62,21 +60,21 @@ func NewGatewayOptions() *GatewayOptions {
 
 // Start starts the Foundation gateway.
 func (s *Gateway) Start(opts *GatewayOptions) {
-	s.logStartup("gateway")
+	s.Options = opts
 
-	gw_runtime.DefaultContextTimeout = opts.Timeout
-	s.Logger.Debugf("Downstream requests timeout: %s", opts.Timeout)
+	s.Service.Start(&StartOptions{
+		ModeName:               "gateway",
+		StartComponentsOptions: s.Options.StartComponentsOptions,
+		ServiceFunc:            s.ServiceFunc,
+	})
+}
 
-	// Start common components
-	if err := s.StartComponents(); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		// TODO: Maybe flush sentry before exiting via Fatal? Fix everywhere if so.
-		s.Logger.Fatal(err)
-	}
+func (s *Gateway) ServiceFunc(ctx context.Context) error {
+	gw_runtime.DefaultContextTimeout = s.Options.Timeout
+	s.Logger.Debugf("Downstream requests timeout: %s", s.Options.Timeout)
 
 	mux, err := gateway.RegisterServices(
-		opts.Services,
+		s.Options.Services,
 		&gateway.RegisterServicesOptions{
 			MuxOpts: []gw_runtime.ServeMuxOption{
 				gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
@@ -85,17 +83,13 @@ func (s *Gateway) Start(opts *GatewayOptions) {
 		},
 	)
 	if err != nil {
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		return fmt.Errorf("failed to register services: %w", err)
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	port := GetEnvOrInt("PORT", 51051)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: s.applyMiddleware(mux, opts),
+		Handler: s.applyMiddleware(mux, s.Options),
 	}
 
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
@@ -109,18 +103,14 @@ func (s *Gateway) Start(opts *GatewayOptions) {
 	}()
 
 	<-ctx.Done()
-	s.Logger.Println("Shutting down service...")
 
 	// Gracefully stop the HTTP server
 	if err := server.Shutdown(context.Background()); err != nil {
 		err = fmt.Errorf("failed to gracefully shutdown HTTP server: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		return err
 	}
 
-	s.StopComponents()
-
-	s.Logger.Println("Service gracefully stopped")
+	return nil
 }
 
 func (s *Service) applyMiddleware(mux http.Handler, opts *GatewayOptions) http.Handler {
