@@ -32,7 +32,7 @@ type RegisterServicesOptions struct {
 	TLSDir string
 }
 
-func RegisterServices(services []Service, opts *RegisterServicesOptions) (http.Handler, error) {
+func RegisterServices(services []*Service, opts *RegisterServicesOptions) (http.Handler, error) {
 	ctx := context.Background()
 
 	muxOpts := append(opts.MuxOpts, runtime.WithErrorHandler(ErrorHandler))

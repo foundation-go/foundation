@@ -36,7 +36,7 @@ func TestHealthHandler(t *testing.T) {
 	assertExample(app, http.StatusOK)
 
 	// When database is enabled, but not connected
-	app.Components = append(app.Components, &fpg.PostgreSQLComponent{})
+	app.Components = append(app.Components, &fpg.Component{})
 	assertExample(app, http.StatusInternalServerError)
 
 	// When Kafka consumer is enabled, but not connected

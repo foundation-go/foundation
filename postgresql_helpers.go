@@ -16,7 +16,7 @@ func (s *Service) GetPostgreSQL() *sql.DB {
 		s.Logger.Fatal(err)
 	}
 
-	pg, ok := component.(*fpg.PostgreSQLComponent)
+	pg, ok := component.(*fpg.Component)
 	if !ok {
 		err := errors.New("PostgreSQL component is not of type *fpg.PostgreSQLComponent")
 		sentry.CaptureException(err)

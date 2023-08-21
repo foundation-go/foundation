@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package foundation.examples.clubchat.chats;
+
+import "examples/clubchat/protos/chats/objects.proto";
+
+option go_package =
+  "github.com/ri-nat/foundation/examples/clubchat/protos/chats";
+
+// Chats service
+service Chats {
+  // ListChats returns a list of chats
+  rpc ListChats(ListChatsRequest) returns (ChatsList) {}
+
+  // SendMessage sends a message to a chat
+  rpc SendMessage(SendMessageRequest) returns (Message) {}
+}
+
+//
+// ListChats
+//
+
+message ListChatsRequest {
+}
+
+//
+// SendMessage
+//
+
+message SendMessageRequest {
+  string chat_id = 1;
+  string text = 2;
+}

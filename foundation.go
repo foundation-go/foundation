@@ -1,14 +1,18 @@
 package foundation
 
 import (
+	"context"
 	"fmt"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
 	fkafka "github.com/ri-nat/foundation/kafka"
 	fpg "github.com/ri-nat/foundation/postgresql"
+	fredis "github.com/ri-nat/foundation/redis"
 	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
@@ -20,18 +24,21 @@ type Service struct {
 	Name       string
 	Config     *Config
 	Components []Component
+	ModeName   string
 
 	Logger *logrus.Entry
 }
 
 // Config represents the configuration of a Service.
 type Config struct {
-	Database *DatabaseConfig
-	GRPC     *GRPCConfig
-	Kafka    *KafkaConfig
-	Metrics  *MetricsConfig
-	Outbox   *OutboxConfig
-	Sentry   *SentryConfig
+	Database     *DatabaseConfig
+	EventsWorker *EventsWorkerConfig
+	GRPC         *GRPCConfig
+	Kafka        *KafkaConfig
+	Metrics      *MetricsConfig
+	Outbox       *OutboxConfig
+	Redis        *RedisConfig
+	Sentry       *SentryConfig
 }
 
 // DatabaseConfig represents the configuration of a PostgreSQL database.
@@ -39,6 +46,18 @@ type DatabaseConfig struct {
 	Enabled bool
 	Pool    int
 	URL     string
+}
+
+// EventsWorkerConfig represents the configuration of an event bus.
+type EventsWorkerConfig struct {
+	// ErrorsTopic is the name of the Kafka topic to which errors from the
+	// events worker handlers should be published.
+	ErrorsTopic string
+
+	// DeliverErrors determines whether errors from events worker handlers
+	// should be published to the errors topic (and thus, delivered
+	// to originator, aka user) or not.
+	DeliverErrors bool
 }
 
 // GRPCConfig represents the configuration of a gRPC server.
@@ -82,6 +101,12 @@ type OutboxConfig struct {
 	Enabled bool
 }
 
+// RedisConfig represents the configuration of a Redis client.
+type RedisConfig struct {
+	Enabled bool
+	URL     string
+}
+
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
@@ -89,6 +114,10 @@ func NewConfig() *Config {
 			Enabled: len(GetEnvOrString("DATABASE_URL", "")) > 0,
 			Pool:    GetEnvOrInt("DATABASE_POOL", 5),
 			URL:     GetEnvOrString("DATABASE_URL", ""),
+		},
+		EventsWorker: &EventsWorkerConfig{
+			ErrorsTopic:   GetEnvOrString("EVENTS_WORKER_ERRORS_TOPIC", "foundation.events_worker.errors"),
+			DeliverErrors: GetEnvOrBool("EVENTS_WORKER_DELIVER_ERRORS", true),
 		},
 		GRPC: &GRPCConfig{
 			TLSDir: GetEnvOrString("GRPC_TLS_DIR", ""),
@@ -110,6 +139,10 @@ func NewConfig() *Config {
 		},
 		Outbox: &OutboxConfig{
 			Enabled: false,
+		},
+		Redis: &RedisConfig{
+			Enabled: len(GetEnvOrString("REDIS_URL", "")) > 0,
+			URL:     GetEnvOrString("REDIS_URL", ""),
 		},
 		Sentry: &SentryConfig{
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
@@ -170,7 +203,7 @@ func (s *Service) addSystemComponents() error {
 
 	// PostgreSQL
 	if s.Config.Database.Enabled {
-		s.Components = append(s.Components, fpg.NewPostgreSQLComponent(
+		s.Components = append(s.Components, fpg.NewComponent(
 			fpg.WithDatabaseURL(s.Config.Database.URL),
 			fpg.WithLogger(s.Logger),
 			fpg.WithPoolSize(s.Config.Database.Pool),
@@ -203,6 +236,14 @@ func (s *Service) addSystemComponents() error {
 			WithMetricsServerHealthHandler(s.healthHandler),
 			WithMetricsServerLogger(s.Logger),
 			WithMetricsServerPort(s.Config.Metrics.Port),
+		))
+	}
+
+	// Redis
+	if s.Config.Redis.Enabled {
+		s.Components = append(s.Components, fredis.NewComponent(
+			fredis.WithLogger(s.Logger),
+			fredis.WithURL(s.Config.Redis.URL),
 		))
 	}
 
@@ -250,4 +291,45 @@ func (s *Service) StopComponents() {
 			s.Logger.Error(err)
 		}
 	}
+}
+
+type StartOptions struct {
+	ModeName               string
+	StartComponentsOptions []StartComponentsOption
+	ServiceFunc            func(ctx context.Context) error
+}
+
+// Start starts the Foundation service.
+func (s *Service) Start(opts *StartOptions) {
+	s.ModeName = opts.ModeName
+
+	// Set running mode to logger
+	s.Logger = s.Logger.WithField("mode", s.ModeName)
+
+	// Log application startup
+	s.logStartup()
+
+	// Start common components
+	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
+		err = fmt.Errorf("failed to start components: %w", err)
+		sentry.CaptureException(err)
+		s.Logger.Fatalf("Failed to start components: %v", err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Run the actual service code
+	if err := opts.ServiceFunc(ctx); err != nil {
+		err = fmt.Errorf("failed to start service: %w", err)
+		sentry.CaptureException(err)
+		s.Logger.Fatalf("Failed to start service: %v", err)
+	}
+
+	<-ctx.Done()
+	s.Logger.Println("Shutting down service...")
+
+	s.StopComponents()
+
+	s.Logger.Println("Service gracefully stopped")
 }

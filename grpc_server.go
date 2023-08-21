@@ -4,14 +4,26 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os/signal"
-	"syscall"
 
 	"github.com/getsentry/sentry-go"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	fg "github.com/ri-nat/foundation/grpc"
 	"google.golang.org/grpc"
 )
+
+// GRPCServer represents a gRPC server mode Foundation service.
+type GRPCServer struct {
+	*Service
+
+	Options *GRPCServerOptions
+}
+
+// InitGRPCServer initializes a new Foundation service in gRPC Server mode.
+func InitGRPCServer(name string) *GRPCServer {
+	return &GRPCServer{
+		Service: Init(name),
+	}
+}
 
 // GRPCServerOptions are the options to start a Foundation service in gRPC Server mode.
 type GRPCServerOptions struct {
@@ -25,24 +37,22 @@ type GRPCServerOptions struct {
 	StartComponentsOptions []StartComponentsOption
 }
 
-func NewGRPCServerOptions() GRPCServerOptions {
-	return GRPCServerOptions{}
+func NewGRPCServerOptions() *GRPCServerOptions {
+	return &GRPCServerOptions{}
 }
 
-// StartGRPCServer starts a Foundation service in gRPC server mode.
-func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
-	s.logStartup("grpc")
+// Start starts a Foundation service in gRPC server mode.
+func (s *GRPCServer) Start(opts *GRPCServerOptions) {
+	s.Options = opts
 
-	// Start common components
-	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatalf("Failed to start components: %v", err)
-	}
+	s.Service.Start(&StartOptions{
+		ModeName:               "grpc",
+		StartComponentsOptions: s.Options.StartComponentsOptions,
+		ServiceFunc:            s.ServiceFunc,
+	})
+}
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
+func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	// Default interceptors
 	//
 	// TODO: Work correctly with interceptors from options
@@ -52,7 +62,7 @@ func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
 		s.foundationErrorToStatusInterceptor,
 	}
 	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
-	opts.GRPCServerOptions = append(opts.GRPCServerOptions, chainedInterceptor)
+	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
 
 	// TLS
 	if s.Config.GRPC.TLSDir != "" {
@@ -60,19 +70,19 @@ func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
 
 		tlsConfig, err := fg.NewTLSConfig(s.Config.GRPC.TLSDir)
 		if err != nil {
-			s.Logger.Fatalf("Failed to configure TLS: %v", err)
+			return fmt.Errorf("failed to load TLS config: %w", err)
 		}
 
-		opts.GRPCServerOptions = append(opts.GRPCServerOptions, grpc.Creds(tlsConfig))
+		s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, grpc.Creds(tlsConfig))
 	} else if IsProductionEnv() {
 		s.Logger.Warn("mTLS for gRPC server is not configured, it is strongly recommended to use mTLS in production")
 	}
 
 	// Start the server
 	listener := s.aquireListener()
-	server := grpc.NewServer(opts.GRPCServerOptions...)
+	server := grpc.NewServer(s.Options.GRPCServerOptions...)
 
-	opts.RegisterFunc(server)
+	s.Options.RegisterFunc(server)
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
@@ -83,13 +93,11 @@ func (s *Service) StartGRPCServer(opts GRPCServerOptions) {
 	}()
 
 	<-ctx.Done()
-	s.Logger.Println("Shutting down service...")
 
 	// Gracefully stop the server
 	server.GracefulStop()
-	s.StopComponents()
 
-	s.Logger.Println("Service gracefully stopped")
+	return nil
 }
 
 func (s *Service) aquireListener() net.Listener {

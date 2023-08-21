@@ -25,10 +25,15 @@ const (
 
 // Channel represents a single communication path, supporting authorization and multiple streams subscription
 type Channel interface {
-	Authorize(ctx context.Context, userID string) error
-	GetStreams(ctx context.Context, userID string) []string
+	// Authorize checks if the user is authorized to subscribe to the channel,
+	// based on the provided user ID and channel identifier.
+	Authorize(ctx context.Context, userID string, ident map[string]string) error
+	// GetStreams returns a list of streams that the user should be subscribed to
+	// or unsubscribe from, based on the provided user ID and channel identifier.
+	GetStreams(ctx context.Context, userID string, ident map[string]string) []string
 }
 
+// AuthenticationFunc is used to authenticate a user based on the provided access token.
 type AuthenticationFunc func(ctx context.Context, accessToken string) (userID string, err error)
 
 // Server encapsulates the AnyCable RPC server functionalities.
@@ -145,7 +150,7 @@ func (s *Server) Command(ctx context.Context, in *pb.CommandMessage) (*pb.Comman
 			}, nil
 		}
 
-		if err = ch.Authorize(ctx, in.Env.Cstate[UserIDKey]); err != nil {
+		if err = ch.Authorize(ctx, in.Env.Cstate[UserIDKey], ident); err != nil {
 			s.Logger.WithError(err).Debug("Authorization failed")
 
 			return &pb.CommandResponse{
@@ -154,7 +159,7 @@ func (s *Server) Command(ctx context.Context, in *pb.CommandMessage) (*pb.Comman
 			}, nil
 		}
 
-		resp.Streams = ch.GetStreams(ctx, in.Env.Cstate[UserIDKey])
+		resp.Streams = ch.GetStreams(ctx, in.Env.Cstate[UserIDKey], ident)
 
 		return resp, nil
 	case CmdUnsubscribe:
@@ -168,7 +173,7 @@ func (s *Server) Command(ctx context.Context, in *pb.CommandMessage) (*pb.Comman
 			}, nil
 		}
 
-		resp.StoppedStreams = ch.GetStreams(ctx, in.Env.Cstate[UserIDKey])
+		resp.StoppedStreams = ch.GetStreams(ctx, in.Env.Cstate[UserIDKey], ident)
 
 		return resp, nil
 	default:

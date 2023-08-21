@@ -2,17 +2,27 @@ package foundation
 
 import (
 	"context"
-	"fmt"
-	"os/signal"
-	"syscall"
 	"time"
-
-	"github.com/getsentry/sentry-go"
 )
 
 const (
 	WorkerDefaultInterval = 5 * time.Millisecond
 )
+
+// Worker is a type of Foundation service.
+type Worker struct {
+	*Service
+
+	Options *WorkerOptions
+}
+
+// InitWorker initializes a new Foundation service in worker mode.
+func InitWorker(name string) *Worker {
+	return &Worker{
+		Init(name),
+		NewWorkerOptions(),
+	}
+}
 
 // WorkerOptions are the options to start a Foundation service in worker mode.
 type WorkerOptions struct {
@@ -32,29 +42,26 @@ type WorkerOptions struct {
 }
 
 // NewWorkerOptions returns a new WorkerOptions instance with default values.
-func NewWorkerOptions() WorkerOptions {
-	return WorkerOptions{
+func NewWorkerOptions() *WorkerOptions {
+	return &WorkerOptions{
 		ModeName: "worker",
 		Interval: WorkerDefaultInterval,
 	}
 }
 
-// StartWorker starts a Foundation service in worker mode.
-func (s *Service) StartWorker(opts WorkerOptions) {
-	s.logStartup(opts.ModeName)
+// Start starts a Foundation worker
+func (w *Worker) Start(opts *WorkerOptions) {
+	w.Options = opts
 
-	// Start common components
-	if err := s.StartComponents(opts.StartComponentsOptions...); err != nil {
-		err = fmt.Errorf("failed to start components: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
-	}
+	w.Service.Start(&StartOptions{
+		ModeName:               opts.ModeName,
+		StartComponentsOptions: w.Options.StartComponentsOptions,
+		ServiceFunc:            w.ServiceFunc,
+	})
+}
 
-	// Watch for termination signals
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	// Run the iteration function in a loop until the service is stopped
+// ServiceFunc is the default service function for a worker.
+func (w *Worker) ServiceFunc(ctx context.Context) error {
 	go func() {
 	Loop:
 		for {
@@ -64,13 +71,13 @@ func (s *Service) StartWorker(opts WorkerOptions) {
 			default:
 				started := time.Now()
 
-				if err := opts.ProcessFunc(ctx); err != nil {
-					s.HandleError(err, "failed to process iteration")
+				if err := w.Options.ProcessFunc(ctx); err != nil {
+					w.HandleError(err, "failed to process iteration")
 				}
 
 				// Sleep for the remaining time of the interval
-				if opts.Interval > 0 {
-					time.Sleep(opts.Interval - time.Since(started))
+				if w.Options.Interval > 0 {
+					time.Sleep(w.Options.Interval - time.Since(started))
 				}
 			}
 		}
@@ -78,9 +85,5 @@ func (s *Service) StartWorker(opts WorkerOptions) {
 
 	<-ctx.Done()
 
-	s.Logger.Info("Shutting down service...")
-
-	s.StopComponents()
-
-	s.Logger.Info("Service gracefully stopped")
+	return nil
 }

@@ -14,7 +14,7 @@ const (
 	ComponentName = "postgresql"
 )
 
-type PostgreSQLComponent struct {
+type Component struct {
 	Connection *sql.DB
 
 	databaseURL string
@@ -22,32 +22,32 @@ type PostgreSQLComponent struct {
 	logger      *logrus.Entry
 }
 
-// PostgreSQLComponentOption is an option to `PostgreSQLComponent`.
-type PostgreSQLComponentOption func(*PostgreSQLComponent)
+// ComponentOption is an option to `PostgreSQLComponent`.
+type ComponentOption func(*Component)
 
 // WithLogger sets the logger for the PostgreSQL component.
-func WithLogger(logger *logrus.Entry) PostgreSQLComponentOption {
-	return func(c *PostgreSQLComponent) {
+func WithLogger(logger *logrus.Entry) ComponentOption {
+	return func(c *Component) {
 		c.logger = logger.WithField("component", c.Name())
 	}
 }
 
 // WithDatabaseURL sets the database URL for the PostgreSQL component.
-func WithDatabaseURL(databaseURL string) PostgreSQLComponentOption {
-	return func(c *PostgreSQLComponent) {
+func WithDatabaseURL(databaseURL string) ComponentOption {
+	return func(c *Component) {
 		c.databaseURL = databaseURL
 	}
 }
 
 // WithPoolSize sets the pool size for the PostgreSQL component.
-func WithPoolSize(poolSize int) PostgreSQLComponentOption {
-	return func(c *PostgreSQLComponent) {
+func WithPoolSize(poolSize int) ComponentOption {
+	return func(c *Component) {
 		c.poolSize = poolSize
 	}
 }
 
-func NewPostgreSQLComponent(opts ...PostgreSQLComponentOption) *PostgreSQLComponent {
-	c := &PostgreSQLComponent{}
+func NewComponent(opts ...ComponentOption) *Component {
+	c := &Component{}
 
 	for _, opt := range opts {
 		opt(c)
@@ -57,7 +57,7 @@ func NewPostgreSQLComponent(opts ...PostgreSQLComponentOption) *PostgreSQLCompon
 }
 
 // Start implements the Component interface.
-func (c *PostgreSQLComponent) Start() error {
+func (c *Component) Start() error {
 	connConfig, err := pgx.ParseConfig(c.databaseURL)
 	c.logger.Debugf("PostgreSQL connection config: %+v", connConfig)
 	if err != nil {
@@ -81,14 +81,14 @@ func (c *PostgreSQLComponent) Start() error {
 }
 
 // Stop implements the Component interface.
-func (c *PostgreSQLComponent) Stop() error {
+func (c *Component) Stop() error {
 	c.logger.Info("Disconnecting from PostgreSQL...")
 
 	return c.Connection.Close()
 }
 
 // Health implements the Component interface.
-func (c *PostgreSQLComponent) Health() error {
+func (c *Component) Health() error {
 	if c.Connection == nil {
 		return fmt.Errorf("connection is not initialized")
 	}
@@ -97,7 +97,7 @@ func (c *PostgreSQLComponent) Health() error {
 }
 
 // Name implements the Component interface.
-func (c *PostgreSQLComponent) Name() string {
+func (c *Component) Name() string {
 	return ComponentName
 }
 

@@ -11,13 +11,13 @@ import (
 type CtxKey string
 
 const (
-	CtxKeyCorrelationID CtxKey = "correlation_id"
-	CtxKeyClientID      CtxKey = "client_id"
-	CtxKeyUserID        CtxKey = "user_id"
 	CtxKeyAccessToken   CtxKey = "access_token"
-	CtxKeyauthenticated CtxKey = "authenticated"
+	CtxKeyAuthenticated CtxKey = "authenticated"
+	CtxKeyClientID      CtxKey = "client_id"
+	CtxKeyCorrelationID CtxKey = "correlation_id"
 	CtxKeyLogger        CtxKey = "logger"
 	CtxKeyTX            CtxKey = "tx"
+	CtxKeyUserID        CtxKey = "user_id"
 )
 
 // GetCorrelationID returns the correlation ID from the context.
@@ -25,8 +25,8 @@ func GetCorrelationID(ctx context.Context) string {
 	return ctx.Value(CtxKeyCorrelationID).(string)
 }
 
-// SetCorrelationID sets the correlation ID in the context.
-func SetCorrelationID(ctx context.Context, correlationID string) context.Context {
+// WithCorrelationID sets the correlation ID to the context
+func WithCorrelationID(ctx context.Context, correlationID string) context.Context {
 	return context.WithValue(ctx, CtxKeyCorrelationID, correlationID)
 }
 
@@ -35,8 +35,8 @@ func GetClientID(ctx context.Context) uuid.UUID {
 	return ctx.Value(CtxKeyClientID).(uuid.UUID)
 }
 
-// SetClientID sets the OAuth client ID in the context.
-func SetClientID(ctx context.Context, clientID uuid.UUID) context.Context {
+// WithClientID sets the OAuth client ID to the context
+func WithClientID(ctx context.Context, clientID uuid.UUID) context.Context {
 	return context.WithValue(ctx, CtxKeyClientID, clientID)
 }
 
@@ -45,8 +45,8 @@ func GetUserID(ctx context.Context) uuid.UUID {
 	return ctx.Value(CtxKeyUserID).(uuid.UUID)
 }
 
-// SetUserID sets the user ID in the context.
-func SetUserID(ctx context.Context, userID uuid.UUID) context.Context {
+// WithUserID sets the user ID to the context
+func WithUserID(ctx context.Context, userID uuid.UUID) context.Context {
 	return context.WithValue(ctx, CtxKeyUserID, userID)
 }
 
@@ -55,19 +55,19 @@ func GetAccessToken(ctx context.Context) string {
 	return ctx.Value(CtxKeyAccessToken).(string)
 }
 
-// SetAccessToken sets the access token in the context.
-func SetAccessToken(ctx context.Context, accessToken string) context.Context {
+// WithAccessToken sets the access token to the context
+func WithAccessToken(ctx context.Context, accessToken string) context.Context {
 	return context.WithValue(ctx, CtxKeyAccessToken, accessToken)
 }
 
 // GetAuthenticated returns the authenticated flag from the context.
 func GetAuthenticated(ctx context.Context) bool {
-	return ctx.Value(CtxKeyauthenticated).(bool)
+	return ctx.Value(CtxKeyAuthenticated).(bool)
 }
 
-// SetAuthenticated sets the authenticated flag in the context.
-func SetAuthenticated(ctx context.Context, authenticated bool) context.Context {
-	return context.WithValue(ctx, CtxKeyauthenticated, authenticated)
+// WithAuthenticated sets the authenticated flag to the context
+func WithAuthenticated(ctx context.Context, authenticated bool) context.Context {
+	return context.WithValue(ctx, CtxKeyAuthenticated, authenticated)
 }
 
 // GetLogger returns the logger from the context.
@@ -75,8 +75,8 @@ func GetLogger(ctx context.Context) *log.Entry {
 	return ctx.Value(CtxKeyLogger).(*log.Entry)
 }
 
-// SetLogger sets the logger in the context.
-func SetLogger(ctx context.Context, logger *log.Entry) context.Context {
+// WithLogger sets the logger to the context
+func WithLogger(ctx context.Context, logger *log.Entry) context.Context {
 	return context.WithValue(ctx, CtxKeyLogger, logger)
 }
 
@@ -85,7 +85,7 @@ func GetTX(ctx context.Context) *sql.Tx {
 	return ctx.Value(CtxKeyTX).(*sql.Tx)
 }
 
-// SetTX sets the transaction in the context.
-func SetTX(ctx context.Context, tx *sql.Tx) context.Context {
+// WithTX sets the transaction to the context
+func WithTX(ctx context.Context, tx *sql.Tx) context.Context {
 	return context.WithValue(ctx, CtxKeyTX, tx)
 }
