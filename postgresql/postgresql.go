@@ -3,6 +3,7 @@ package postgresql
 import (
 	"database/sql"
 	"fmt"
+	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -128,6 +129,14 @@ func NewNullInt64(num *int64) (res sql.NullInt64) {
 func NewNullString(str *string) (res sql.NullString) {
 	if str != nil {
 		res.Scan(*str) // nolint: errcheck
+	}
+
+	return
+}
+
+func NewNullUUID(uuid *string) (res uuid.NullUUID) {
+	if uuid != nil {
+		res.Scan(*uuid) // nolint: errcheck
 	}
 
 	return
