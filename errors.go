@@ -93,7 +93,7 @@ type InvalidArgumentError struct {
 
 	Kind       string
 	ID         string
-	Violations map[string][]InvalidArgumentErrorCode
+	Violations map[string][]fmt.Stringer
 }
 
 func (e *InvalidArgumentError) GRPCStatus() *status.Status {
@@ -148,7 +148,7 @@ func (e *InvalidArgumentError) MarshalJSON() ([]byte, error) {
 }
 
 // NewInvalidArgumentError creates an invalid argument error with error details.
-func NewInvalidArgumentError(kind string, id string, violations map[string][]InvalidArgumentErrorCode) *InvalidArgumentError {
+func NewInvalidArgumentError(kind string, id string, violations map[string][]fmt.Stringer) *InvalidArgumentError {
 	return &InvalidArgumentError{
 		BaseError: &BaseError{
 			Err: fmt.Errorf("invalid argument: %s/%s", kind, id),
