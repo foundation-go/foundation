@@ -65,13 +65,35 @@ func NewInternalError(err error, msg string) *InternalError {
 	}
 }
 
+type InvalidArgumentErrorCode string
+
+const (
+	Accepted     InvalidArgumentErrorCode = "Accepted"     // Accepted Must be accepted
+	Blank        InvalidArgumentErrorCode = "Blank"        // Blank Can't be blank
+	Empty        InvalidArgumentErrorCode = "Empty"        // Empty Can't be empty
+	Even         InvalidArgumentErrorCode = "Even"         // Even Must be even
+	Exclusion    InvalidArgumentErrorCode = "Exclusion"    // Exclusion Is reserved
+	Inclusion    InvalidArgumentErrorCode = "Inclusion"    // Inclusion Is not included in the list
+	Invalid      InvalidArgumentErrorCode = "Invalid"      // Invalid Is invalid
+	NotANumber   InvalidArgumentErrorCode = "NotANumber"   // NotANumber Is not a number
+	NotAnInteger InvalidArgumentErrorCode = "NotAnInteger" // NotAnInteger Must be an integer
+	Odd          InvalidArgumentErrorCode = "Odd"          // Odd Must be odd
+	Present      InvalidArgumentErrorCode = "Present"      // Present Must be blank
+	Required     InvalidArgumentErrorCode = "Required"     // Required Must exist
+	Taken        InvalidArgumentErrorCode = "Taken"        // Taken Has already been taken
+)
+
+func (i InvalidArgumentErrorCode) String() string {
+	return string(i)
+}
+
 // InvalidArgumentError describes an invalid argument error.
 type InvalidArgumentError struct {
 	*BaseError
 
 	Kind       string
 	ID         string
-	Violations map[string][]string
+	Violations map[string][]fmt.Stringer
 }
 
 func (e *InvalidArgumentError) GRPCStatus() *status.Status {
@@ -87,7 +109,7 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 		for _, d := range description {
 			badRequest.FieldViolations = append(badRequest.FieldViolations, &errdetails.BadRequest_FieldViolation{
 				Field:       fmt.Sprintf("%s#%s", obj, field),
-				Description: d,
+				Description: d.String(),
 			})
 		}
 	}
@@ -112,7 +134,7 @@ func (e *InvalidArgumentError) MarshalProto() proto.Message {
 		for _, d := range description {
 			err.Violations = append(err.Violations, &ferr.InvalidArgumentError_Violation{
 				Field:       field,
-				Description: d,
+				Description: d.String(),
 			})
 		}
 	}
@@ -126,7 +148,7 @@ func (e *InvalidArgumentError) MarshalJSON() ([]byte, error) {
 }
 
 // NewInvalidArgumentError creates an invalid argument error with error details.
-func NewInvalidArgumentError(kind string, id string, violations map[string][]string) *InvalidArgumentError {
+func NewInvalidArgumentError(kind string, id string, violations map[string][]fmt.Stringer) *InvalidArgumentError {
 	return &InvalidArgumentError{
 		BaseError: &BaseError{
 			Err: fmt.Errorf("invalid argument: %s/%s", kind, id),
