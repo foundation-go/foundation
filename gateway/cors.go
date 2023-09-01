@@ -24,6 +24,10 @@ var (
 
 	corsExposedHeaders = []string{
 		fhttp.HeaderXCorrelationID,
+		fhttp.HeaderXTotal,
+		fhttp.HeaderXTotalPages,
+		fhttp.HeaderXPerPage,
+		fhttp.HeaderXPage,
 	}
 )
 

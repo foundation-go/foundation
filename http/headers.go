@@ -25,6 +25,15 @@ const (
 	HeaderXCorrelationID = "X-Correlation-Id"
 	// HeaderXUserID is the header that contains the user ID
 	HeaderXUserID = "X-User-Id"
+
+	// HeaderXTotal is the header that contains the total number of items
+	HeaderXTotal = "X-Total"
+	// HeaderXTotalPages is the header that contains the total number of pages
+	HeaderXTotalPages = "X-Total-Pages"
+	// HeaderXPerPage is the header that contains the number of items per page
+	HeaderXPerPage = "X-Per-Page"
+	// HeaderXPage is the header that contains the current page
+	HeaderXPage = "X-Page"
 )
 
 // All the Foundation headers
@@ -33,4 +42,9 @@ var FoundationHeaders = []string{
 	HeaderXClientID,
 	HeaderXCorrelationID,
 	HeaderXUserID,
+
+	HeaderXTotal,
+	HeaderXTotalPages,
+	HeaderXPerPage,
+	HeaderXPage,
 }
