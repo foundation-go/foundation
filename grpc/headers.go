@@ -7,11 +7,12 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/google/uuid"
+	fctx "github.com/ri-nat/foundation/context"
 	fhttp "github.com/ri-nat/foundation/http"
 )
 
-// GetHeader returns the value of the given header from the given context.
-func GetHeader(ctx context.Context, name string) (s string) {
+// GetMetadata retrieves the value of a specified header from the metadata of a given context.
+func GetMetadata(ctx context.Context, name string) (s string) {
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if p, ok := md[name]; ok {
 			s = strings.Join(p, ",")
@@ -21,15 +22,15 @@ func GetHeader(ctx context.Context, name string) (s string) {
 	return
 }
 
-// GetCorrelationID returns the correlation ID from the given context.
-func GetCorrelationID(ctx context.Context) string {
-	return GetHeader(ctx, strings.ToLower(fhttp.HeaderXCorrelationID))
+// getCorrelationID returns the correlation ID from the given context.
+func getCorrelationID(ctx context.Context) string {
+	return GetMetadata(ctx, strings.ToLower(fhttp.HeaderXCorrelationID))
 }
 
-// GetClientID returns the OAuth client ID from the given context. It assumes that the OAuth client ID is a UUID, and
+// getClientID returns the OAuth client ID from the given context. It assumes that the OAuth client ID is a UUID, and
 // returns `uuid.Nil` (`00000000-0000-0000-0000-000000000000`) if the client ID is not a valid UUID.
-func GetClientID(ctx context.Context) uuid.UUID {
-	idStr := GetHeader(ctx, strings.ToLower(fhttp.HeaderXClientID))
+func getClientID(ctx context.Context) uuid.UUID {
+	idStr := GetMetadata(ctx, strings.ToLower(fhttp.HeaderXClientID))
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return uuid.Nil
@@ -38,10 +39,15 @@ func GetClientID(ctx context.Context) uuid.UUID {
 	return id
 }
 
-// GetUserID returns the user ID from the given context. It assumes that the user ID is a UUID, and returns
+// getScopes retrieves the OAuth scopes from the specified context.
+func getScopes(ctx context.Context) fctx.Oauth2Scopes {
+	return strings.Split(GetMetadata(ctx, strings.ToLower(fhttp.HeaderXScope)), " ")
+}
+
+// getUserID returns the user ID from the given context. It assumes that the user ID is a UUID, and returns
 // `uuid.Nil` (`00000000-0000-0000-0000-000000000000`) if the user ID is not a valid UUID.
-func GetUserID(ctx context.Context) uuid.UUID {
-	idStr := GetHeader(ctx, strings.ToLower(fhttp.HeaderXUserID))
+func getUserID(ctx context.Context) uuid.UUID {
+	idStr := GetMetadata(ctx, strings.ToLower(fhttp.HeaderXUserID))
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		return uuid.Nil
@@ -50,15 +56,17 @@ func GetUserID(ctx context.Context) uuid.UUID {
 	return id
 }
 
-// GetAccessToken returns the access token from the given context.
-func GetAccessToken(ctx context.Context) string {
-	s := GetHeader(ctx, strings.ToLower(fhttp.HeaderAuthorization))
+// getAccessToken returns the access token from the specified context.
+//
+// Any prefix (e.g. `Bearer`) is removed from the token.
+func getAccessToken(ctx context.Context) string {
+	s := GetMetadata(ctx, strings.ToLower(fhttp.HeaderAuthorization))
 	parts := strings.Split(s, " ")
 
 	return parts[len(parts)-1]
 }
 
-// GetAuthenticated returns the authenticated flag from the given context.
-func GetAuthenticated(ctx context.Context) bool {
-	return GetHeader(ctx, strings.ToLower(fhttp.HeaderXAuthenticated)) == "true"
+// getAuthenticated returns the authenticated flag from the specified context.
+func getAuthenticated(ctx context.Context) bool {
+	return GetMetadata(ctx, strings.ToLower(fhttp.HeaderXAuthenticated)) == "true"
 }

@@ -17,7 +17,7 @@ func (s *Service) GetRedis() *redis.Client {
 
 	comp, ok := component.(*fredis.Component)
 	if !ok {
-		err := errors.New("redis component is not of type *fredis.RedisComponent")
+		err := errors.New("redis component is not of type *foundation_redis.Component")
 		sentry.CaptureException(err)
 		s.Logger.Fatal(err)
 	}

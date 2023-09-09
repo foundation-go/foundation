@@ -16,7 +16,7 @@ import (
 	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
-const Version = "0.1.1"
+const Version = "0.2.0"
 
 // Service represents a single microservice - part of the bigger Foundation-based application, which implements
 // an isolated domain of the application logic.

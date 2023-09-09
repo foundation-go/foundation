@@ -130,7 +130,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 
 // CableDefaultErrorResolver is a default resolver for errors that returns a stream
 // name based on the user ID in the event headers.
-var CableDefaultErrorResolver = func(ctx context.Context, event *Event, _ proto.Message) (string, error) {
+func CableDefaultErrorResolver(ctx context.Context, event *Event, _ proto.Message) (string, error) {
 	userID := event.Headers[fkafka.HeaderOriginatorID]
 
 	if userID == "" {

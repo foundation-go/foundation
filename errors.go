@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
+	fctx "github.com/ri-nat/foundation/context"
 	ferr "github.com/ri-nat/foundation/errors"
 )
 
@@ -25,17 +27,42 @@ func (e *BaseError) Error() string {
 	return e.Err.Error()
 }
 
+// GRPCStatus returns a gRPC status error for the Foundation error.
+func (e *BaseError) GRPCStatus() *status.Status {
+	return status.New(codes.Internal, e.Err.Error())
+}
+
+// ErrorCode describes an error code.
+type ErrorCode string
+
+// Generic error codes.
+const (
+	ErrorCodeAccepted     ErrorCode = "Accepted"     // ErrorCodeAccepted - Must be accepted
+	ErrorCodeBlank        ErrorCode = "Blank"        // ErrorCodeBlank - Can't be blank
+	ErrorCodeEmpty        ErrorCode = "Empty"        // ErrorCodeEmpty - Can't be empty
+	ErrorCodeEven         ErrorCode = "Even"         // ErrorCodeEven - Must be even
+	ErrorCodeExclusion    ErrorCode = "Exclusion"    // ErrorCodeExclusion - Is reserved
+	ErrorCodeInclusion    ErrorCode = "Inclusion"    // ErrorCodeInclusion - Is not included in the list
+	ErrorCodeInvalid      ErrorCode = "Invalid"      // ErrorCodeInvalid - Is invalid
+	ErrorCodeNotANumber   ErrorCode = "NotANumber"   // ErrorCodeNotANumber - Is not a number
+	ErrorCodeNotAnInteger ErrorCode = "NotAnInteger" // ErrorCodeNotAnInteger - Must be an integer
+	ErrorCodeOdd          ErrorCode = "Odd"          // ErrorCodeOdd - Must be odd
+	ErrorCodePresent      ErrorCode = "Present"      // ErrorCodePresent - Must be blank
+	ErrorCodeRequired     ErrorCode = "Required"     // ErrorCodeRequired - Must exist
+	ErrorCodeTaken        ErrorCode = "Taken"        // ErrorCodeTaken - Has already been taken
+)
+
+// String implements the Stringer interface.
+func (i ErrorCode) String() string {
+	return string(i)
+}
+
 // FoundationError describes an interface for all errors in the Foundation framework.
 type FoundationError interface {
 	error
 	GRPCStatus() *status.Status
 	MarshalProto() proto.Message
 	MarshalJSON() ([]byte, error)
-}
-
-// GRPCStatus returns a gRPC status error for the Foundation error.
-func (e *BaseError) GRPCStatus() *status.Status {
-	return status.New(codes.Internal, e.Err.Error())
 }
 
 // InternalError
@@ -65,27 +92,8 @@ func NewInternalError(err error, msg string) *InternalError {
 	}
 }
 
-type InvalidArgumentErrorCode string
-
-const (
-	Accepted     InvalidArgumentErrorCode = "Accepted"     // Accepted Must be accepted
-	Blank        InvalidArgumentErrorCode = "Blank"        // Blank Can't be blank
-	Empty        InvalidArgumentErrorCode = "Empty"        // Empty Can't be empty
-	Even         InvalidArgumentErrorCode = "Even"         // Even Must be even
-	Exclusion    InvalidArgumentErrorCode = "Exclusion"    // Exclusion Is reserved
-	Inclusion    InvalidArgumentErrorCode = "Inclusion"    // Inclusion Is not included in the list
-	Invalid      InvalidArgumentErrorCode = "Invalid"      // Invalid Is invalid
-	NotANumber   InvalidArgumentErrorCode = "NotANumber"   // NotANumber Is not a number
-	NotAnInteger InvalidArgumentErrorCode = "NotAnInteger" // NotAnInteger Must be an integer
-	Odd          InvalidArgumentErrorCode = "Odd"          // Odd Must be odd
-	Present      InvalidArgumentErrorCode = "Present"      // Present Must be blank
-	Required     InvalidArgumentErrorCode = "Required"     // Required Must exist
-	Taken        InvalidArgumentErrorCode = "Taken"        // Taken Has already been taken
-)
-
-func (i InvalidArgumentErrorCode) String() string {
-	return string(i)
-}
+// ErrorViolations describes a map of field names to error codes.
+type ErrorViolations = map[string][]fmt.Stringer
 
 // InvalidArgumentError describes an invalid argument error.
 type InvalidArgumentError struct {
@@ -93,7 +101,7 @@ type InvalidArgumentError struct {
 
 	Kind       string
 	ID         string
-	Violations map[string][]fmt.Stringer
+	Violations ErrorViolations
 }
 
 func (e *InvalidArgumentError) GRPCStatus() *status.Status {
@@ -238,6 +246,26 @@ func NewPermissionDeniedError(action string, kind string, id string) *Permission
 	}
 }
 
+// NewInsufficientScopeAllError creates an error for cases where all the expected
+// scopes are required.
+func NewInsufficientScopeAllError(expectedScopes ...string) *PermissionDeniedError {
+	return &PermissionDeniedError{
+		BaseError: &BaseError{
+			Err: fmt.Errorf("insufficient scope: expected to be `%v`", strings.Join(expectedScopes, " ")),
+		},
+	}
+}
+
+// NewInsufficientScopeAnyError creates an error for cases where
+// any of the expected scopes is required.
+func NewInsufficientScopeAnyError(expectedScopes ...string) *PermissionDeniedError {
+	return &PermissionDeniedError{
+		BaseError: &BaseError{
+			Err: fmt.Errorf("insufficient scope: expected to be any of `%v`", strings.Join(expectedScopes, " ")),
+		},
+	}
+}
+
 // UnauthenticatedError describes an unauthenticated error.
 type UnauthenticatedError struct {
 	*BaseError
@@ -328,13 +356,18 @@ func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion 
 
 func (s *Service) foundationErrorToStatusInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	h, err := handler(ctx, req)
+	log := fctx.GetLogger(ctx)
 
 	if err != nil {
-		if fErr, ok := err.(FoundationError); ok {
-			s.HandleError(fErr, "")
+		fErr, ok := err.(FoundationError)
 
-			return h, fErr.GRPCStatus().Err()
+		if !ok {
+			log.Infof("Received non-Foundation error: %v, wrapping it in an InternalError", err)
+			fErr = NewInternalError(err, "")
 		}
+
+		return h, fErr.GRPCStatus().Err()
+
 	}
 
 	return h, err

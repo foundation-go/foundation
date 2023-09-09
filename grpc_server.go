@@ -6,9 +6,10 @@ import (
 	"net"
 
 	"github.com/getsentry/sentry-go"
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	fg "github.com/ri-nat/foundation/grpc"
+	grpcm "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
+
+	fg "github.com/ri-nat/foundation/grpc"
 )
 
 // GRPCServer represents a gRPC server mode Foundation service.
@@ -41,7 +42,7 @@ func NewGRPCServerOptions() *GRPCServerOptions {
 	return &GRPCServerOptions{}
 }
 
-// Start starts a Foundation service in gRPC server mode.
+// Start initializes the Foundation service in gRPC server mode.
 func (s *GRPCServer) Start(opts *GRPCServerOptions) {
 	s.Options = opts
 
@@ -55,14 +56,18 @@ func (s *GRPCServer) Start(opts *GRPCServerOptions) {
 func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	// Default interceptors
 	//
-	// TODO: Work correctly with interceptors from options
-	interceptors := []grpc.UnaryServerInterceptor{
+	// N.B.: Interceptors are executed in the order they are defined.
+	defaultInterceptors := grpc.UnaryInterceptor(grpcm.ChainUnaryServer(
 		fg.MetadataInterceptor,
 		fg.LoggingInterceptor(s.Logger),
 		s.foundationErrorToStatusInterceptor,
-	}
-	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
-	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
+	))
+
+	// Construct the default server options
+	defaultOptions := []grpc.ServerOption{defaultInterceptors}
+
+	// Prepend the default server options in front of the application-defined ones
+	serverOptions := append(defaultOptions, s.Options.GRPCServerOptions...)
 
 	// TLS
 	if s.Config.GRPC.TLSDir != "" {
@@ -73,14 +78,14 @@ func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 			return fmt.Errorf("failed to load TLS config: %w", err)
 		}
 
-		s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, grpc.Creds(tlsConfig))
+		serverOptions = append(serverOptions, grpc.Creds(tlsConfig))
 	} else if IsProductionEnv() {
 		s.Logger.Warn("mTLS for gRPC server is not configured, it is strongly recommended to use mTLS in production")
 	}
 
 	// Start the server
-	listener := s.aquireListener()
-	server := grpc.NewServer(s.Options.GRPCServerOptions...)
+	listener := s.acquireListener()
+	server := grpc.NewServer(serverOptions...)
 
 	s.Options.RegisterFunc(server)
 
@@ -100,7 +105,7 @@ func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) aquireListener() net.Listener {
+func (s *Service) acquireListener() net.Listener {
 	port := GetEnvOrInt("PORT", 51051)
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {

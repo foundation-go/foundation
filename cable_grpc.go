@@ -71,7 +71,7 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
 
 	// Start the server
-	listener := s.aquireListener()
+	listener := s.acquireListener()
 	server := grpc.NewServer(s.Options.GRPCServerOptions...)
 
 	pb.RegisterRPCServer(server, &cable_grpc.Server{

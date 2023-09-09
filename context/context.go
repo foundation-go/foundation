@@ -16,9 +16,46 @@ const (
 	CtxKeyClientID      CtxKey = "client_id"
 	CtxKeyCorrelationID CtxKey = "correlation_id"
 	CtxKeyLogger        CtxKey = "logger"
+	CtxKeyScopes        CtxKey = "scopes"
 	CtxKeyTX            CtxKey = "tx"
 	CtxKeyUserID        CtxKey = "user_id"
 )
+
+// Oauth2Scopes represents a list of OAuth scopes.
+type Oauth2Scopes []string
+
+// ContainsAll checks if the list of OAuth scopes contains **all** the specified scopes.
+func (s Oauth2Scopes) ContainsAll(scopes ...string) bool {
+	for _, scope := range scopes {
+		found := false
+
+		for _, sc := range s {
+			if sc == scope {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// ContainsAny checks if the list of OAuth scopes contains any of the specified scopes.
+func (s Oauth2Scopes) ContainsAny(scopes ...string) bool {
+	for _, scope := range scopes {
+		for _, sc := range s {
+			if sc == scope {
+				return true
+			}
+		}
+	}
+
+	return false
+}
 
 // GetCorrelationID returns the correlation ID from the context.
 func GetCorrelationID(ctx context.Context) string {
@@ -78,6 +115,16 @@ func GetLogger(ctx context.Context) *log.Entry {
 // WithLogger sets the logger to the context
 func WithLogger(ctx context.Context, logger *log.Entry) context.Context {
 	return context.WithValue(ctx, CtxKeyLogger, logger)
+}
+
+// GetScopes returns the OAuth scopes from the context.
+func GetScopes(ctx context.Context) Oauth2Scopes {
+	return ctx.Value(CtxKeyScopes).(Oauth2Scopes)
+}
+
+// WithScopes sets the OAuth scopes to the context
+func WithScopes(ctx context.Context, scopes Oauth2Scopes) context.Context {
+	return context.WithValue(ctx, CtxKeyScopes, scopes)
 }
 
 // GetTX returns the transaction from the context.
