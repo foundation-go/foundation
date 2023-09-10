@@ -47,7 +47,7 @@ func NewCableGRPCOptions() *CableGRPCOptions {
 	return &CableGRPCOptions{}
 }
 
-// Start starts a Foundation as an AnyCable-compartible gRPC server.
+// Start runs the Foundation as an AnyCable-compartible gRPC server.
 func (s *CableGRPC) Start(opts *CableGRPCOptions) {
 	s.Options = opts
 

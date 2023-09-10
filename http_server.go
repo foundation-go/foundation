@@ -36,7 +36,7 @@ func NewHTTPServerOptions() *HTTPServerOptions {
 	return &HTTPServerOptions{}
 }
 
-// Start starts a Foundation service in HTTP Server mode.
+// Start runs the Foundation service in HTTP Server mode.
 func (s *HTTPServer) Start(opts *HTTPServerOptions) {
 	s.Options = opts
 

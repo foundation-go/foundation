@@ -58,7 +58,7 @@ func NewGatewayOptions() *GatewayOptions {
 	}
 }
 
-// Start starts the Foundation gateway.
+// Start runs the Foundation gateway.
 func (s *Gateway) Start(opts *GatewayOptions) {
 	s.Options = opts
 

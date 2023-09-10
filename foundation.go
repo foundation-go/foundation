@@ -299,7 +299,7 @@ type StartOptions struct {
 	ServiceFunc            func(ctx context.Context) error
 }
 
-// Start starts the Foundation service.
+// Start runs the Foundation service.
 func (s *Service) Start(opts *StartOptions) {
 	s.ModeName = opts.ModeName
 

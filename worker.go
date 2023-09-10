@@ -51,7 +51,7 @@ func NewWorkerOptions() *WorkerOptions {
 	}
 }
 
-// Start starts a Foundation worker
+// Start runs the Foundation worker
 func (w *Worker) Start(opts *WorkerOptions) {
 	w.Options = opts
 

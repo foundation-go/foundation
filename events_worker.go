@@ -91,7 +91,7 @@ func (opts *EventsWorkerOptions) ProtoNamesToMessages() map[string]proto.Message
 	return protoNamesToMessages
 }
 
-// Start starts a worker that handles events
+// Start runs the worker that handles events
 func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 	wOpts := NewWorkerOptions()
 	wOpts.ModeName = opts.ModeName
