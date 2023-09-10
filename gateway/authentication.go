@@ -17,6 +17,7 @@ type AuthenticationResult struct {
 	IsAuthenticated bool
 	ClientID        string
 	UserID          string
+	Scope           string
 }
 
 // WithHydraAuthenticationDetails is a middleware that fetches the authentication details using ORY Hydra
@@ -38,6 +39,7 @@ func WithHydraAuthenticationDetails(handler http.Handler) http.Handler {
 				IsAuthenticated: true,
 				ClientID:        resp.GetClientId(),
 				UserID:          resp.GetSub(),
+				Scope:           resp.GetScope(),
 			}, nil
 		}).ServeHTTP(w, r)
 	})
@@ -89,6 +91,7 @@ func WithAuthentication(except []string) func(http.Handler) http.Handler {
 func setAuthHeaders(r *http.Request, result *AuthenticationResult) *http.Request {
 	r.Header.Set(fhttp.HeaderXAuthenticated, strconv.FormatBool(result.IsAuthenticated))
 	r.Header.Set(fhttp.HeaderXClientID, result.ClientID)
+	r.Header.Set(fhttp.HeaderXScope, result.Scope)
 	r.Header.Set(fhttp.HeaderXUserID, result.UserID)
 
 	return r

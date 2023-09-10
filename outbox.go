@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	fctx "github.com/ri-nat/foundation/context"
+	ferr "github.com/ri-nat/foundation/errors"
 	fkafka "github.com/ri-nat/foundation/kafka"
 )
 
@@ -25,19 +26,19 @@ type Event struct {
 }
 
 // Unmarshal unmarshals the event payload into a protobuf message
-func (e *Event) Unmarshal(msg proto.Message) FoundationError {
+func (e *Event) Unmarshal(msg proto.Message) ferr.FoundationError {
 	if err := proto.Unmarshal(e.Payload, msg); err != nil {
-		return NewInternalError(err, "failed to unmarshal Event payload")
+		return ferr.NewInternalError(err, "failed to unmarshal Event payload")
 	}
 
 	return nil
 }
 
 // NewEventFromProto creates a new event from a protobuf message
-func NewEventFromProto(msg proto.Message, key string, headers map[string]string) (*Event, FoundationError) {
+func NewEventFromProto(msg proto.Message, key string, headers map[string]string) (*Event, ferr.FoundationError) {
 	payload, err := proto.Marshal(msg)
 	if err != nil {
-		return nil, NewInternalError(err, "failed to marshal message")
+		return nil, ferr.NewInternalError(err, "failed to marshal message")
 	}
 
 	// Get proto name
@@ -71,14 +72,14 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 }
 
 // publishEventToOutbox publishes an event to the outbox.
-func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) ferr.FoundationError {
 	commitNeeded := false
 
 	if tx == nil {
 		// Start transaction
 		tx, err := s.GetPostgreSQL().Begin()
 		if err != nil {
-			return NewInternalError(err, "failed to begin transaction")
+			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
 		defer tx.Rollback() // nolint:errcheck
 		commitNeeded = true
@@ -87,7 +88,7 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 	// Marshal headers to JSON
 	headers, err := json.Marshal(event.Headers)
 	if err != nil {
-		return NewInternalError(err, "failed to marshal headers")
+		return ferr.NewInternalError(err, "failed to marshal headers")
 	}
 
 	queries := outboxrepo.New(tx)
@@ -99,12 +100,12 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 	}
 	// Publish event
 	if err := queries.CreateOutboxEvent(ctx, params); err != nil {
-		return NewInternalError(err, "failed to insert event into outbox")
+		return ferr.NewInternalError(err, "failed to insert event into outbox")
 	}
 
 	if commitNeeded {
 		if err = tx.Commit(); err != nil {
-			return NewInternalError(err, "failed to commit transaction")
+			return ferr.NewInternalError(err, "failed to commit transaction")
 		}
 	}
 
@@ -112,14 +113,14 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 }
 
 // publishEventToKafka publishes an event to the Kafka topic.
-func (s *Service) publishEventToKafka(ctx context.Context, event *Event) FoundationError {
+func (s *Service) publishEventToKafka(ctx context.Context, event *Event) ferr.FoundationError {
 	message, err := NewMessageFromEvent(event)
 	if err != nil {
-		return NewInternalError(err, "failed to create message from event")
+		return ferr.NewInternalError(err, "failed to create message from event")
 	}
 
 	if err := s.GetKafkaProducer().WriteMessages(ctx, *message); err != nil {
-		return NewInternalError(err, "failed to publish event to Kafka")
+		return ferr.NewInternalError(err, "failed to publish event to Kafka")
 	}
 
 	return nil
@@ -127,7 +128,7 @@ func (s *Service) publishEventToKafka(ctx context.Context, event *Event) Foundat
 
 // PublishEvent publishes an event to the outbox, starting a new transaction,
 // or straight to the Kafka topic if `OUTBOX_ENABLED` is not set.
-func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) FoundationError {
+func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) ferr.FoundationError {
 	event = addDefaultHeaders(ctx, event)
 
 	if s.Config.Outbox.Enabled {
@@ -138,7 +139,7 @@ func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) Fo
 }
 
 // NewAndPublishEvent creates a new event and publishes it to the outbox within a transaction
-func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) FoundationError {
+func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) ferr.FoundationError {
 	event, err := NewEventFromProto(msg, key, headers)
 	if err != nil {
 		return err
@@ -149,53 +150,53 @@ func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key
 
 // WithTransaction executes the given function in a transaction. If the function
 // returns an event, it will be published.
-func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, FoundationError)) FoundationError {
+func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, ferr.FoundationError)) ferr.FoundationError {
 	// Start transaction
 	tx, err := s.GetPostgreSQL().Begin()
 	if err != nil {
-		return NewInternalError(err, "failed to begin transaction")
+		return ferr.NewInternalError(err, "failed to begin transaction")
 	}
 	defer tx.Rollback() // nolint: errcheck
 
 	// Execute function
-	event, ferr := f(tx)
-	if ferr != nil {
-		return ferr
+	event, fErr := f(tx)
+	if fErr != nil {
+		return fErr
 	}
 
 	// Publish event (if any)
 	if event != nil {
 		if err = s.PublishEvent(ctx, event, tx); err != nil {
-			return NewInternalError(err, "failed to publish event")
+			return ferr.NewInternalError(err, "failed to publish event")
 		}
 	}
 
 	// Commit transaction
 	if err = tx.Commit(); err != nil {
-		return NewInternalError(err, "failed to commit transaction")
+		return ferr.NewInternalError(err, "failed to commit transaction")
 	}
 
 	return nil
 }
 
 // ListOutboxEvents returns a list of outbox events in the order they were created.
-func (s *Service) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, FoundationError) {
+func (s *Service) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
 	queries := outboxrepo.New(s.GetPostgreSQL())
 
 	events, err := queries.ListOutboxEvents(ctx, limit)
 	if err != nil {
-		return nil, NewInternalError(err, "failed to `ListOutboxEvents`")
+		return nil, ferr.NewInternalError(err, "failed to `ListOutboxEvents`")
 	}
 
 	return events, nil
 }
 
 // DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
-func (s *Service) DeleteOutboxEvents(ctx context.Context, maxID int64) FoundationError {
+func (s *Service) DeleteOutboxEvents(ctx context.Context, maxID int64) ferr.FoundationError {
 	queries := outboxrepo.New(s.GetPostgreSQL())
 
 	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {
-		return NewInternalError(err, "failed to `DeleteOutboxEvents`")
+		return ferr.NewInternalError(err, "failed to `DeleteOutboxEvents`")
 	}
 
 	return nil

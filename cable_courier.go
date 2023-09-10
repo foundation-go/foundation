@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	cable_courier "github.com/ri-nat/foundation/cable/courier"
 	ferr "github.com/ri-nat/foundation/errors"
+	ferrpb "github.com/ri-nat/foundation/errors/proto"
 	fkafka "github.com/ri-nat/foundation/kafka"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
@@ -56,12 +57,12 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 	handlers := make(map[proto.Message][]EventHandler)
 
 	errors := []proto.Message{
-		&ferr.InternalError{},
-		&ferr.UnauthenticatedError{},
-		&ferr.StaleObjectError{},
-		&ferr.NotFoundError{},
-		&ferr.PermissionDeniedError{},
-		&ferr.InvalidArgumentError{},
+		&ferrpb.InternalError{},
+		&ferrpb.UnauthenticatedError{},
+		&ferrpb.StaleObjectError{},
+		&ferrpb.NotFoundError{},
+		&ferrpb.PermissionDeniedError{},
+		&ferrpb.InvalidArgumentError{},
 	}
 
 	// Add default resolvers for errors, if not already defined
@@ -99,7 +100,7 @@ func (c *CableCourier) Start(opts *CableCourierOptions) {
 
 // Handle uses the associated CableMessageResolver to determine the appropriate stream
 // for the event and broadcasts the message to that stream.
-func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg proto.Message) ([]*Event, FoundationError) {
+func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg proto.Message) ([]*Event, ferr.FoundationError) {
 	stream, err := h.Resolver(ctx, event, msg)
 	if err != nil {
 		// We don't want the event_worker to broadcast any errors from the cable_courier
@@ -130,7 +131,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 
 // CableDefaultErrorResolver is a default resolver for errors that returns a stream
 // name based on the user ID in the event headers.
-var CableDefaultErrorResolver = func(ctx context.Context, event *Event, _ proto.Message) (string, error) {
+func CableDefaultErrorResolver(ctx context.Context, event *Event, _ proto.Message) (string, error) {
 	userID := event.Headers[fkafka.HeaderOriginatorID]
 
 	if userID == "" {

@@ -83,7 +83,7 @@ func TestWithAuthenticationDetails(t *testing.T) {
 
 func TestWithAuthentication(t *testing.T) {
 	// Create a mock handler
-	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// Write a response
 		w.WriteHeader(http.StatusOK)
 	})

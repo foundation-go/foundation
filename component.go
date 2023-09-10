@@ -7,7 +7,7 @@ type Component interface {
 	Health() error
 	// Name returns the name of the component
 	Name() string
-	// Start starts the component
+	// Start runs the component
 	Start() error
 	// Stop stops the component
 	Stop() error

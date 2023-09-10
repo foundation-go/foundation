@@ -16,7 +16,7 @@ import (
 	fsentry "github.com/ri-nat/foundation/sentry"
 )
 
-const Version = "0.1.1"
+const Version = "0.2.0"
 
 // Service represents a single microservice - part of the bigger Foundation-based application, which implements
 // an isolated domain of the application logic.
@@ -299,7 +299,7 @@ type StartOptions struct {
 	ServiceFunc            func(ctx context.Context) error
 }
 
-// Start starts the Foundation service.
+// Start runs the Foundation service.
 func (s *Service) Start(opts *StartOptions) {
 	s.ModeName = opts.ModeName
 

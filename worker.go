@@ -3,6 +3,8 @@ package foundation
 import (
 	"context"
 	"time"
+
+	ferr "github.com/ri-nat/foundation/errors"
 )
 
 const (
@@ -27,7 +29,7 @@ func InitWorker(name string) *Worker {
 // WorkerOptions are the options to start a Foundation service in worker mode.
 type WorkerOptions struct {
 	// ProcessFunc is the function to execute in the loop iteration.
-	ProcessFunc func(ctx context.Context) FoundationError
+	ProcessFunc func(ctx context.Context) ferr.FoundationError
 
 	// Interval is the interval to run the iteration function. If function execution took less time than the interval,
 	// the worker will sleep for the remaining time of the interval. Otherwise, the function will be executed again
@@ -49,7 +51,7 @@ func NewWorkerOptions() *WorkerOptions {
 	}
 }
 
-// Start starts a Foundation worker
+// Start runs the Foundation worker
 func (w *Worker) Start(opts *WorkerOptions) {
 	w.Options = opts
 

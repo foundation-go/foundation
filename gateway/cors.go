@@ -9,6 +9,7 @@ import (
 	fhttp "github.com/ri-nat/foundation/http"
 )
 
+// TODO: Make these configurable on the Service level.
 var (
 	corsAllowedOrigin = "*"
 	corsMaxAge        = 24 * time.Hour

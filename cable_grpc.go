@@ -47,7 +47,7 @@ func NewCableGRPCOptions() *CableGRPCOptions {
 	return &CableGRPCOptions{}
 }
 
-// Start starts a Foundation as an AnyCable-compartible gRPC server.
+// Start runs the Foundation as an AnyCable-compartible gRPC server.
 func (s *CableGRPC) Start(opts *CableGRPCOptions) {
 	s.Options = opts
 
@@ -65,13 +65,13 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	//
 	// TODO: Work correctly with interceptors from s.Options
 	interceptors := []grpc.UnaryServerInterceptor{
-		fg.LoggingInterceptor(s.Logger),
+		fg.LoggingUnaryInterceptor(s.Logger),
 	}
 	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
 	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
 
 	// Start the server
-	listener := s.aquireListener()
+	listener := s.acquireListener()
 	server := grpc.NewServer(s.Options.GRPCServerOptions...)
 
 	pb.RegisterRPCServer(server, &cable_grpc.Server{
