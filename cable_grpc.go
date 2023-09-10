@@ -65,7 +65,7 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	//
 	// TODO: Work correctly with interceptors from s.Options
 	interceptors := []grpc.UnaryServerInterceptor{
-		fg.LoggingInterceptor(s.Logger),
+		fg.LoggingUnaryInterceptor(s.Logger),
 	}
 	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
 	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)

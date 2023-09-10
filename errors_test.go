@@ -45,7 +45,7 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 	ctx := fctx.WithLogger(context.Background(), app.Logger)
 
 	// Call the interceptor with the mock handler and check that it returns the expected error status
-	_, err := app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err := app.foundationErrorToStatusUnaryInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {
@@ -64,7 +64,7 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 		return "test", nil
 	}
 
-	_, err = app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err = app.foundationErrorToStatusUnaryInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err != nil {
 		t.Errorf("Expected no error, but got %v", err)
 	}
@@ -74,7 +74,7 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 		return nil, status.Error(codes.NotFound, "not found")
 	}
 
-	_, err = app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err = app.foundationErrorToStatusUnaryInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {
