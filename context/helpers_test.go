@@ -1,17 +1,16 @@
-package foundation
+package context
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	fctx "github.com/ri-nat/foundation/context"
 	ferr "github.com/ri-nat/foundation/errors"
 	"github.com/stretchr/testify/assert"
 )
 
 func mockContextWithScope(scope string) context.Context {
-	return fctx.WithScopes(context.Background(), fctx.Oauth2Scopes(strings.Split(scope, " ")))
+	return WithScopes(context.Background(), Oauth2Scopes(strings.Split(scope, " ")))
 }
 
 func TestCheckScopePresenceFuncs(t *testing.T) {
