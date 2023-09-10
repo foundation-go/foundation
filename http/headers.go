@@ -26,19 +26,19 @@ const (
 	// HeaderXCorrelationID contains the correlation ID.
 	HeaderXCorrelationID = "X-Correlation-Id"
 
-	// HeaderXPage is the header that contains the current page
+	// HeaderXPage contains the current page
 	HeaderXPage = "X-Page"
 
-	// HeaderXPerPage is the header that contains the number of items per page
+	// HeaderXPerPage contains the number of items per page
 	HeaderXPerPage = "X-Per-Page"
 
 	// HeaderXScope contains the OAuth scope.
 	HeaderXScope = "X-Scope"
 
-	// HeaderXTotal is the header that contains the total number of items
+	// HeaderXTotal contains the total number of items
 	HeaderXTotal = "X-Total"
 
-	// HeaderXTotalPages is the header that contains the total number of pages
+	// HeaderXTotalPages contains the total number of pages
 	HeaderXTotalPages = "X-Total-Pages"
 
 	// HeaderXUserID contains the user ID.

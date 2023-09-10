@@ -9,6 +9,7 @@ import (
 	"time"
 
 	fctx "github.com/ri-nat/foundation/context"
+	ferr "github.com/ri-nat/foundation/errors"
 	fkafka "github.com/ri-nat/foundation/kafka"
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
@@ -22,7 +23,7 @@ type EventsWorker struct {
 
 // EventHandler represents an event handler
 type EventHandler interface {
-	Handle(context.Context, *Event, proto.Message) ([]*Event, FoundationError)
+	Handle(context.Context, *Event, proto.Message) ([]*Event, ferr.FoundationError)
 }
 
 // EventsWorkerOptions represents the options for starting an events worker
@@ -119,16 +120,16 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHandler) func(ctx context.Context) FoundationError {
-	return func(ctx context.Context) FoundationError {
+func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHandler) func(ctx context.Context) ferr.FoundationError {
+	return func(ctx context.Context) ferr.FoundationError {
 		msg, err := w.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
-			return NewInternalError(err, "failed to read message from Kafka")
+			return ferr.NewInternalError(err, "failed to read message from Kafka")
 		}
 
 		event := newEventFromKafkaMessage(&msg)
 
-		var handleErr FoundationError
+		var handleErr ferr.FoundationError
 
 		log := w.Logger.WithFields(map[string]interface{}{
 			"correlation_id": event.Headers[fkafka.HeaderCorrelationID],
@@ -141,7 +142,7 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 		curHandlers := handlers[protoMsg]
 		err = proto.Unmarshal(event.Payload, protoMsg)
 		if err != nil {
-			return NewInternalError(err, "failed to unmarshal event payload")
+			return ferr.NewInternalError(err, "failed to unmarshal event payload")
 		}
 
 		for _, handler := range curHandlers {
@@ -181,7 +182,7 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 	}
 }
 
-func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, event *Event, msg proto.Message) FoundationError {
+func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, event *Event, msg proto.Message) ferr.FoundationError {
 	var (
 		tx         *sql.Tx
 		needCommit bool
@@ -191,7 +192,7 @@ func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, e
 	if w.Config.Database.Enabled {
 		tx, err = w.GetPostgreSQL().Begin()
 		if err != nil {
-			return NewInternalError(err, "failed to begin transaction")
+			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
 		defer tx.Rollback() // nolint:errcheck
 		needCommit = true
@@ -219,7 +220,7 @@ func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, e
 	if needCommit {
 		// Commit transaction
 		if err = tx.Commit(); err != nil {
-			return NewInternalError(err, "failed to commit transaction")
+			return ferr.NewInternalError(err, "failed to commit transaction")
 		}
 	}
 
@@ -229,7 +230,7 @@ func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, e
 // CommitMessage tries to commit a Kafka message using the service's KafkaConsumer.
 // If the commit operation fails, it retries up to three times with a one-second pause between retries.
 // If all attempts fail, the function returns the last occurred error.
-func (s *Service) CommitMessage(ctx context.Context, msg kafka.Message) FoundationError {
+func (s *Service) CommitMessage(ctx context.Context, msg kafka.Message) ferr.FoundationError {
 	// TODO: Make something clever here, like exponential backoff
 	for i := 0; i < 3; i++ {
 		err := s.GetKafkaConsumer().CommitMessages(ctx, msg)
@@ -238,7 +239,7 @@ func (s *Service) CommitMessage(ctx context.Context, msg kafka.Message) Foundati
 		}
 
 		if i == 2 {
-			return NewInternalError(err, "failed to commit message")
+			return ferr.NewInternalError(err, "failed to commit message")
 		}
 
 		time.Sleep(1 * time.Second)

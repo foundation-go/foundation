@@ -4,13 +4,14 @@ import (
 	"context"
 
 	f "github.com/ri-nat/foundation"
+	ferr "github.com/ri-nat/foundation/errors"
 	pb "github.com/ri-nat/foundation/examples/clubchat/protos/chats"
 )
 
 func (s *chatsServer) ListChats(ctx context.Context, req *pb.ListChatsRequest) (*pb.ChatsList, error) {
 	// Return an error with custom error code
 	if false {
-		return nil, f.NewInvalidArgumentError("Chat", "", f.ErrorViolations{
+		return nil, ferr.NewInvalidArgumentError("Chat", "", ferr.ErrorViolations{
 			"base": {ErrorCodeCustom},
 		})
 	}

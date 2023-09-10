@@ -2,6 +2,7 @@ package main
 
 import (
 	f "github.com/ri-nat/foundation"
+	ferr "github.com/ri-nat/foundation/errors"
 	pb "github.com/ri-nat/foundation/examples/clubchat/protos/chats"
 
 	"google.golang.org/grpc"
@@ -15,7 +16,7 @@ var (
 // Custom error codes
 const (
 	// ErrorCodeCustom is the custom error code used in the example.
-	ErrorCodeCustom f.ErrorCode = "custom_code"
+	ErrorCodeCustom ferr.ErrorCode = "custom_code"
 )
 
 // OAuth scopes

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	fctx "github.com/ri-nat/foundation/context"
+	ferr "github.com/ri-nat/foundation/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -30,7 +31,7 @@ func TestCheckScopePresenceFuncs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := mockContextWithScope(tt.contextScopes)
-			var err *PermissionDeniedError
+			var err *ferr.PermissionDeniedError
 
 			switch tt.functionToTest {
 			case "all":
@@ -41,7 +42,7 @@ func TestCheckScopePresenceFuncs(t *testing.T) {
 
 			if tt.shouldError {
 				assert.NotNil(t, err)
-				assert.IsType(t, &PermissionDeniedError{}, err)
+				assert.IsType(t, &ferr.PermissionDeniedError{}, err)
 			} else {
 				assert.Nil(t, err)
 			}

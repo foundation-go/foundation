@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package foundation.errors;
 
-option go_package = "github.com/ri-nat/foundation/errors";
+option go_package = "github.com/ri-nat/foundation/errors/proto";
 
 message InternalError {
 }
