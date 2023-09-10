@@ -2,16 +2,15 @@ package foundation
 
 import (
 	"context"
+	"strings"
 	"testing"
 
-	fhttp "github.com/ri-nat/foundation/http"
+	fctx "github.com/ri-nat/foundation/context"
 	"github.com/stretchr/testify/assert"
-	"google.golang.org/grpc/metadata"
 )
 
 func mockContextWithScope(scope string) context.Context {
-	md := metadata.Pairs(fhttp.HeaderXScope, scope)
-	return metadata.NewIncomingContext(context.Background(), md)
+	return fctx.WithScopes(context.Background(), fctx.Oauth2Scopes(strings.Split(scope, " ")))
 }
 
 func TestCheckScopePresenceFuncs(t *testing.T) {
