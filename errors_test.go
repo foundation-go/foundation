@@ -9,6 +9,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	fctx "github.com/ri-nat/foundation/context"
 )
 
 func TestInternalError(t *testing.T) {
@@ -36,12 +38,14 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 	app := Init("test-app")
 
 	// Define a mock handler that returns an error
-	mockHandler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	mockHandler := func(context.Context, interface{}) (interface{}, error) {
 		return nil, NewNotFoundError(nil, "test", "123")
 	}
 
+	ctx := fctx.WithLogger(context.Background(), app.Logger)
+
 	// Call the interceptor with the mock handler and check that it returns the expected error status
-	_, err := app.foundationErrorToStatusInterceptor(context.Background(), nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err := app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {
@@ -60,7 +64,7 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 		return "test", nil
 	}
 
-	_, err = app.foundationErrorToStatusInterceptor(context.Background(), nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err = app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err != nil {
 		t.Errorf("Expected no error, but got %v", err)
 	}
@@ -70,7 +74,7 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 		return nil, status.Error(codes.NotFound, "not found")
 	}
 
-	_, err = app.foundationErrorToStatusInterceptor(context.Background(), nil, &grpc.UnaryServerInfo{}, mockHandler)
+	_, err = app.foundationErrorToStatusInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, mockHandler)
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {

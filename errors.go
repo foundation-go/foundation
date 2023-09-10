@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
-	fctx "github.com/ri-nat/foundation/context"
 	ferr "github.com/ri-nat/foundation/errors"
 )
 
@@ -356,18 +355,11 @@ func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion 
 
 func (s *Service) foundationErrorToStatusInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	h, err := handler(ctx, req)
-	log := fctx.GetLogger(ctx)
 
 	if err != nil {
-		fErr, ok := err.(FoundationError)
-
-		if !ok {
-			log.Infof("Received non-Foundation error: %v, wrapping it in an InternalError", err)
-			fErr = NewInternalError(err, "")
+		if fErr, ok := err.(FoundationError); ok {
+			return h, fErr.GRPCStatus().Err()
 		}
-
-		return h, fErr.GRPCStatus().Err()
-
 	}
 
 	return h, err
