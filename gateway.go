@@ -78,6 +78,7 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 		&gateway.RegisterServicesOptions{
 			MuxOpts: []gw_runtime.ServeMuxOption{
 				gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
+				gw_runtime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
 			},
 			TLSDir: s.Config.GRPC.TLSDir,
 		},
