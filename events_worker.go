@@ -146,7 +146,7 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 		}
 
 		// Add explicit handlers
-		protoMsg := proto.Clone(templateProtoMsg).(proto.Message)
+		protoMsg := proto.Clone(templateProtoMsg)
 		curHandlers := handlers[templateProtoMsg]
 		err = proto.Unmarshal(event.Payload, protoMsg)
 		if err != nil {
