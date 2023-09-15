@@ -141,7 +141,7 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 
 		templateProtoMsg, ok := w.protoNamesToMessages[event.ProtoName]
 		if !ok {
-			log.Info("Skip event without handlers")
+			log.Debugf("Skip event without handlers: `%s`", event.ProtoName)
 			return nil
 		}
 
