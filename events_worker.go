@@ -93,6 +93,8 @@ func (opts *EventsWorkerOptions) ProtoNamesToMessages() map[string]proto.Message
 
 // Start runs the worker that handles events
 func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
+	w.protoNamesToMessages = opts.ProtoNamesToMessages()
+
 	wOpts := NewWorkerOptions()
 	wOpts.ModeName = opts.ModeName
 	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
@@ -137,9 +139,15 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 		})
 		log.Info("Received event")
 
+		templateProtoMsg, ok := w.protoNamesToMessages[event.ProtoName]
+		if !ok {
+			log.Debugf("Skip event without handlers: `%s`", event.ProtoName)
+			return nil
+		}
+
 		// Add explicit handlers
-		protoMsg := Clone(w.protoNamesToMessages[event.ProtoName]).(proto.Message)
-		curHandlers := handlers[protoMsg]
+		protoMsg := proto.Clone(templateProtoMsg)
+		curHandlers := handlers[templateProtoMsg]
 		err = proto.Unmarshal(event.Payload, protoMsg)
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to unmarshal event payload")
