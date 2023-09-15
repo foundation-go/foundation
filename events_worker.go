@@ -138,6 +138,11 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 		log.Info("Received event")
 
 		// Add explicit handlers
+		_, ok := w.protoNamesToMessages[event.ProtoName]
+		if !ok {
+			log.Info("Skip event without handlers")
+			return nil
+		}
 		protoMsg := Clone(w.protoNamesToMessages[event.ProtoName]).(proto.Message)
 		curHandlers := handlers[protoMsg]
 		err = proto.Unmarshal(event.Payload, protoMsg)
