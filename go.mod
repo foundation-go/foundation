@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7
-	github.com/getsentry/sentry-go v0.23.0
+	github.com/getsentry/sentry-go v0.25.0
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/google/uuid v1.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
