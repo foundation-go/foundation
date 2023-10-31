@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/getsentry/sentry-go"
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	cable_grpc "github.com/ri-nat/foundation/cable/grpc"
+	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	cablegrpc "github.com/ri-nat/foundation/cable/grpc"
 	pb "github.com/ri-nat/foundation/cable/grpc/proto"
 	fg "github.com/ri-nat/foundation/grpc"
 	"google.golang.org/grpc"
@@ -35,12 +35,12 @@ type CableGRPCOptions struct {
 	StartComponentsOptions []StartComponentsOption
 
 	// Channels are the channels to use.
-	Channels map[string]cable_grpc.Channel
+	Channels map[string]cablegrpc.Channel
 
 	// WithAuthentication enables authentication.
 	WithAuthentication bool
 	// AuthenticationFunc is the function to use for authentication.
-	AuthenticationFunc cable_grpc.AuthenticationFunc
+	AuthenticationFunc cablegrpc.AuthenticationFunc
 }
 
 func NewCableGRPCOptions() *CableGRPCOptions {
@@ -67,14 +67,14 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	interceptors := []grpc.UnaryServerInterceptor{
 		fg.LoggingUnaryInterceptor(s.Logger),
 	}
-	chainedInterceptor := grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(interceptors...))
+	chainedInterceptor := grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(interceptors...))
 	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
 
 	// Start the server
 	listener := s.acquireListener()
 	server := grpc.NewServer(s.Options.GRPCServerOptions...)
 
-	pb.RegisterRPCServer(server, &cable_grpc.Server{
+	pb.RegisterRPCServer(server, &cablegrpc.Server{
 		Channels:           s.Options.Channels,
 		WithAuthentication: s.Options.WithAuthentication,
 		AuthenticationFunc: s.Options.AuthenticationFunc,

@@ -12,20 +12,20 @@ import (
 	"github.com/google/uuid"
 )
 
-// loggingResponseWriter is an http.ResponseWriter that tracks the status code of the response.
-type loggingResponseWriter struct {
+// LoggingResponseWriter is an http.ResponseWriter that tracks the status code of the response.
+type LoggingResponseWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
 // NewLoggingResponseWriter creates a new loggingResponseWriter that wraps the provided http.ResponseWriter.
 // If WriteHeader is not called, the response will implicitly return a status code of 200 OK.
-func NewLoggingResponseWriter(w http.ResponseWriter) *loggingResponseWriter {
-	return &loggingResponseWriter{w, http.StatusOK}
+func NewLoggingResponseWriter(w http.ResponseWriter) *LoggingResponseWriter {
+	return &LoggingResponseWriter{w, http.StatusOK}
 }
 
 // WriteHeader sets the status code of the response and calls the underlying ResponseWriter's WriteHeader method.
-func (lrw *loggingResponseWriter) WriteHeader(code int) {
+func (lrw *LoggingResponseWriter) WriteHeader(code int) {
 	lrw.statusCode = code
 	lrw.ResponseWriter.WriteHeader(code)
 }

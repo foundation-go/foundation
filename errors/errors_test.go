@@ -19,13 +19,13 @@ func TestInternalError(t *testing.T) {
 		t.Errorf("Expected error message to end with '%s', but got '%s'", expectedSuff, err.Error())
 	}
 
-	// Check that the error can be converted to a gRPC status error
-	status, ok := status.FromError(err)
+	// Check that the error can be converted to a gRPC s error
+	s, ok := status.FromError(err)
 	if !ok {
-		t.Error("Expected a gRPC status error, but got a different error type")
-	} else if status.Code() != codes.Internal {
-		t.Errorf("Expected error code %s, but got %s", codes.Internal, status.Code())
-	} else if status.Message() != "internal error" {
-		t.Errorf("Expected error message '%s', but got '%s'", "internal error", status.Message())
+		t.Error("Expected a gRPC s error, but got a different error type")
+	} else if s.Code() != codes.Internal {
+		t.Errorf("Expected error code %s, but got %s", codes.Internal, s.Code())
+	} else if s.Message() != "internal error" {
+		t.Errorf("Expected error message '%s', but got '%s'", "internal error", s.Message())
 	}
 }

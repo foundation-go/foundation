@@ -6,7 +6,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/redis/go-redis/v9"
-	cable_courier "github.com/ri-nat/foundation/cable/courier"
+	cablecourier "github.com/ri-nat/foundation/cable/courier"
 	ferr "github.com/ri-nat/foundation/errors"
 	ferrpb "github.com/ri-nat/foundation/errors/proto"
 	fkafka "github.com/ri-nat/foundation/kafka"
@@ -88,7 +88,7 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 	return handlers
 }
 
-// Start initializes a cable_courier worker using the given CableCourierOptions.
+// Start runs a cable_courier worker using the given CableCourierOptions.
 func (c *CableCourier) Start(opts *CableCourierOptions) {
 	ewOpts := &EventsWorkerOptions{
 		ModeName: "cable_courier",
@@ -119,7 +119,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 	}
 
 	// Broadcast the message to the stream.
-	cable_courier.NewClient(h.Redis).BroadcastMessage(
+	cablecourier.NewClient(h.Redis).BroadcastMessage(
 		event.ProtoName,
 		msg,
 		stream,
@@ -131,7 +131,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 
 // CableDefaultErrorResolver is a default resolver for errors that returns a stream
 // name based on the user ID in the event headers.
-func CableDefaultErrorResolver(ctx context.Context, event *Event, _ proto.Message) (string, error) {
+func CableDefaultErrorResolver(_ context.Context, event *Event, _ proto.Message) (string, error) {
 	userID := event.Headers[fkafka.HeaderOriginatorID]
 
 	if userID == "" {

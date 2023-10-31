@@ -14,10 +14,10 @@ const (
 // GenerateRandomString generates a random string of length n. Panics if an error occurs.
 func GenerateRandomString(n int) string {
 	var sb strings.Builder
-	max := big.NewInt(int64(len(Alphabet)))
+	maxValue := big.NewInt(int64(len(Alphabet)))
 
 	for i := 0; i < n; i++ {
-		randomInt, err := rand.Int(rand.Reader, max)
+		randomInt, err := rand.Int(rand.Reader, maxValue)
 		if err != nil {
 			panic(err)
 		}

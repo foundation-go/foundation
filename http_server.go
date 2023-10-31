@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -57,7 +58,7 @@ func (s *HTTPServer) ServiceFunc(ctx context.Context) error {
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			err = fmt.Errorf("failed to start HTTP server: %w", err)
 			sentry.CaptureException(err)
 			s.Logger.Fatal(err)

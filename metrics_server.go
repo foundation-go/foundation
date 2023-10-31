@@ -1,6 +1,7 @@
 package foundation
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -69,7 +70,7 @@ func (c *MetricsServerComponent) Start() error {
 	c.logger.Infof("Exposing metrics HTTP server on http://0.0.0.0:%d", c.port)
 
 	go func() {
-		if err := c.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := c.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			err = fmt.Errorf("failed to start metrics server: %w", err)
 			sentry.CaptureException(err)
 			c.logger.Fatal(err)

@@ -11,6 +11,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// RedisChannel is a name of redis channel used by AnyCable
+//
 // TODO: Make configurable via `ANYCABLE_REDIS_CHANNEL`
 const RedisChannel = "__anycable__"
 
