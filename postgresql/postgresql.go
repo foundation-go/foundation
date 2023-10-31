@@ -3,6 +3,7 @@ package postgresql
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5"
@@ -102,42 +103,52 @@ func (c *Component) Name() string {
 	return ComponentName
 }
 
-func NewNullTimeFromPbTimestamp(timestamp *timestamppb.Timestamp) (res sql.NullTime) {
+func NewNullTimeFromPbTimestamp(timestamp *timestamppb.Timestamp) sql.NullTime {
+	result := sql.NullTime{}
+
 	if timestamp.GetSeconds() > 0 || timestamp.GetNanos() > 0 {
-		res.Scan(timestamp.AsTime()) // nolint: errcheck
+		_ = result.Scan(timestamp.AsTime())
 	}
 
-	return
+	return result
 }
 
-func NewNullInt32(num *int32) (res sql.NullInt32) {
+func NewNullInt32(num *int32) sql.NullInt32 {
+	result := sql.NullInt32{}
+
 	if num != nil {
-		res.Scan(*num) // nolint: errcheck
+		_ = result.Scan(*num)
 	}
 
-	return
+	return result
 }
 
-func NewNullInt64(num *int64) (res sql.NullInt64) {
+func NewNullInt64(num *int64) sql.NullInt64 {
+	result := sql.NullInt64{}
+
 	if num != nil {
-		res.Scan(*num) // nolint: errcheck
+		_ = result.Scan(*num)
 	}
 
-	return
+	return result
 }
 
-func NewNullString(str *string) (res sql.NullString) {
+func NewNullString(str *string) sql.NullString {
+	result := sql.NullString{}
+
 	if str != nil {
-		res.Scan(*str) // nolint: errcheck
+		_ = result.Scan(*str)
 	}
 
-	return
+	return result
 }
 
-func NewNullUUID(uuid *string) (res uuid.NullUUID) {
-	if uuid != nil {
-		res.Scan(*uuid) // nolint: errcheck
+func NewNullUUID(uuidStr *string) uuid.NullUUID {
+	result := uuid.NullUUID{}
+
+	if uuidStr != nil {
+		_ = result.Scan(*uuidStr)
 	}
 
-	return
+	return result
 }

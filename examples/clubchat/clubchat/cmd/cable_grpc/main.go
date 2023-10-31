@@ -3,7 +3,7 @@ package main
 import (
 	f "github.com/ri-nat/foundation"
 
-	cable_grpc "github.com/ri-nat/foundation/cable/grpc"
+	cablegrpc "github.com/ri-nat/foundation/cable/grpc"
 )
 
 var (
@@ -12,11 +12,11 @@ var (
 
 func main() {
 	app.Start(&f.CableGRPCOptions{
-		Channels: map[string]cable_grpc.Channel{
+		Channels: map[string]cablegrpc.Channel{
 			"ChatsChannel": &chatsChannel{},
 			"UserChannel":  &userChannel{},
 		},
 		WithAuthentication: true,
-		AuthenticationFunc: cable_grpc.HydraAuthenticationFunc,
+		AuthenticationFunc: cablegrpc.HydraAuthenticationFunc,
 	})
 }

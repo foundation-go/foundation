@@ -62,7 +62,7 @@ type FoundationError interface {
 	MarshalJSON() ([]byte, error)
 }
 
-// InternalError
+// InternalError describes an internal error
 type InternalError struct {
 	*BaseError
 }

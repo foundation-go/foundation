@@ -24,13 +24,13 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {
-		status, ok := status.FromError(err)
+		s, ok := status.FromError(err)
 		if !ok {
-			t.Error("Expected a gRPC status error, but got a different error type")
-		} else if status.Code() != codes.NotFound {
-			t.Errorf("Expected error code %s, but got %s", codes.NotFound, status.Code())
-		} else if status.Message() != "not found: test/123" {
-			t.Errorf("Expected error message 'not found: test/123', but got '%s'", status.Message())
+			t.Error("Expected a gRPC s error, but got a different error type")
+		} else if s.Code() != codes.NotFound {
+			t.Errorf("Expected error code %s, but got %s", codes.NotFound, s.Code())
+		} else if s.Message() != "not found: test/123" {
+			t.Errorf("Expected error message 'not found: test/123', but got '%s'", s.Message())
 		}
 	}
 
@@ -53,13 +53,13 @@ func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 	if err == nil {
 		t.Error("Expected an error, but got nil")
 	} else {
-		status, ok := status.FromError(err)
+		s, ok := status.FromError(err)
 		if !ok {
-			t.Error("Expected a gRPC status error, but got a different error type")
-		} else if status.Code() != codes.NotFound {
-			t.Errorf("Expected error code %s, but got %s", codes.NotFound, status.Code())
-		} else if status.Message() != "not found" {
-			t.Errorf("Expected error message 'not found', but got '%s'", status.Message())
+			t.Error("Expected a gRPC s error, but got a different error type")
+		} else if s.Code() != codes.NotFound {
+			t.Errorf("Expected error code %s, but got %s", codes.NotFound, s.Code())
+		} else if s.Message() != "not found" {
+			t.Errorf("Expected error message 'not found', but got '%s'", s.Message())
 		}
 	}
 }

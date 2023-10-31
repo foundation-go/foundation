@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -9,7 +10,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	gw_runtime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	gwruntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
 	"github.com/ri-nat/foundation/gateway"
 )
@@ -70,15 +71,15 @@ func (s *Gateway) Start(opts *GatewayOptions) {
 }
 
 func (s *Gateway) ServiceFunc(ctx context.Context) error {
-	gw_runtime.DefaultContextTimeout = s.Options.Timeout
+	gwruntime.DefaultContextTimeout = s.Options.Timeout
 	s.Logger.Debugf("Downstream requests timeout: %s", s.Options.Timeout)
 
 	mux, err := gateway.RegisterServices(
 		s.Options.Services,
 		&gateway.RegisterServicesOptions{
-			MuxOpts: []gw_runtime.ServeMuxOption{
-				gw_runtime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
-				gw_runtime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
+			MuxOpts: []gwruntime.ServeMuxOption{
+				gwruntime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
+				gwruntime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
 			},
 			TLSDir: s.Config.GRPC.TLSDir,
 		},
@@ -96,7 +97,7 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			err = fmt.Errorf("failed to start server: %w", err)
 			sentry.CaptureException(err)
 			s.Logger.Fatal(err)
