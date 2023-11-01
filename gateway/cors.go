@@ -88,18 +88,13 @@ func WithCORSEnabled(options *CORSOptions) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 
-			if origin == "" {
-				if r.Method == http.MethodOptions {
-					http.Error(w, "Missing Origin header in preflight request", http.StatusBadRequest)
-					return
-				}
-
-				// Backend-to-backend request, no CORS needed.
-				handler.ServeHTTP(w, r)
+			if origin == "" && r.Method == http.MethodOptions {
+				http.Error(w, "Missing Origin header in preflight request", http.StatusBadRequest)
 				return
 			}
 
-			if options.AllowedOrigin != "*" && origin != options.AllowedOrigin {
+			// origin could be empty for server to server requests.
+			if origin != "" && options.AllowedOrigin != "*" && origin != options.AllowedOrigin {
 				http.Error(w, fmt.Sprintf("CORS origin %s not allowed", origin), http.StatusForbidden)
 				return
 			}
