@@ -37,7 +37,7 @@ type CORSOptions struct {
 	// AllowedOrigin is the allowed origin for CORS.
 	AllowedOrigin string
 	// MaxAge is the max age for CORS.
-	MaxAge time.Duration
+	MaxAge *time.Duration
 	// AllowedHeaders are the allowed headers for CORS.
 	AllowedHeaders []string
 	// ExposedHeaders are the exposed headers for CORS.
@@ -52,7 +52,7 @@ func NewCORSOptions() *CORSOptions {
 
 func getUniqueStrings(input []string) []string {
 	keys := make(map[string]bool)
-	list := []string{}
+	list := make([]string, 0, len(input))
 
 	for _, entry := range input {
 		if !keys[entry] {
@@ -69,8 +69,8 @@ func setDefaultCORSOptions(options *CORSOptions) *CORSOptions {
 		options.AllowedOrigin = corsAllowedOrigin
 	}
 
-	if options.MaxAge == 0 {
-		options.MaxAge = corsMaxAge
+	if options.MaxAge == nil {
+		options.MaxAge = &corsMaxAge
 	}
 
 	options.AllowedHeaders = getUniqueStrings(append(options.AllowedHeaders, corsAllowedHeaders...))
@@ -89,7 +89,13 @@ func WithCORSEnabled(options *CORSOptions) func(http.Handler) http.Handler {
 			origin := r.Header.Get("Origin")
 
 			if origin == "" {
-				http.Error(w, "Missing Origin header", http.StatusBadRequest)
+				if r.Method == http.MethodOptions {
+					http.Error(w, "Missing Origin header in preflight request", http.StatusBadRequest)
+					return
+				}
+
+				// Backend-to-backend request, no CORS needed.
+				handler.ServeHTTP(w, r)
 				return
 			}
 
