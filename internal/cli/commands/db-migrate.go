@@ -22,7 +22,7 @@ var DBMigrate = &cobra.Command{
 	Use:     "db:migrate",
 	Aliases: []string{"dbm"},
 	Short:   "Run database migrations",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		var dir string
 		databaseURL := f.GetEnvOrString("DATABASE_URL", "")
 
@@ -62,4 +62,5 @@ var DBMigrate = &cobra.Command{
 
 func init() {
 	DBMigrate.Flags().StringP("dir", "d", MigrationsDirectory, "Directory containing migrations (only applicable in production)")
+	DBMigrate.MarkFlagDirname("dir")
 }

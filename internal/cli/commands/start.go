@@ -15,7 +15,7 @@ var Start = &cobra.Command{
 	Use:     "start",
 	Aliases: []string{"s"},
 	Short:   "Start a service",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		if !h.BuiltOnFoundation() {
 			log.Fatal("This command must be run from inside a Foundation project")
 		}

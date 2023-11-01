@@ -19,7 +19,7 @@ var DBRollback = &cobra.Command{
 	Aliases: []string{"dbr"},
 	Short:   "Rollback database migrations",
 	Long:    "Rollback database migrations by a given number of steps, e.g.: `foundation db:rollback --steps 2`",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		var dir string
 		databaseURL := f.GetEnvOrString("DATABASE_URL", "")
 
@@ -68,5 +68,6 @@ var DBRollback = &cobra.Command{
 
 func init() {
 	DBRollback.Flags().StringP("dir", "d", MigrationsDirectory, "Directory containing migrations (only applicable in production)")
+	DBRollback.MarkFlagDirname("dir")
 	DBRollback.Flags().Int32P("steps", "s", 1, "Number of migrations to rollback")
 }

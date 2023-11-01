@@ -15,7 +15,7 @@ var Test = &cobra.Command{
 	Use:     "test",
 	Aliases: []string{"t"},
 	Short:   "Run tests",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		if !h.BuiltOnFoundation() {
 			log.Fatal("This command must be run from inside a Foundation project")
 		}
