@@ -50,12 +50,15 @@ type GatewayOptions struct {
 	Middleware []func(http.Handler) http.Handler
 	// StartComponentsOptions are the options to start the components.
 	StartComponentsOptions []StartComponentsOption
+	// CORSOptions are the options for CORS.
+	CORSOptions *gateway.CORSOptions
 }
 
 // NewGatewayOptions returns a new GatewayOptions with default values.
 func NewGatewayOptions() *GatewayOptions {
 	return &GatewayOptions{
-		Timeout: GatewayDefaultTimeout,
+		Timeout:     GatewayDefaultTimeout,
+		CORSOptions: gateway.NewCORSOptions(),
 	}
 }
 
@@ -119,7 +122,7 @@ func (s *Service) applyMiddleware(mux http.Handler, opts *GatewayOptions) http.H
 	var middleware []func(http.Handler) http.Handler
 
 	// General middleware
-	middleware = append(middleware, gateway.WithRequestLogger(s.Logger), gateway.WithCORSEnabled)
+	middleware = append(middleware, gateway.WithRequestLogger(s.Logger), gateway.WithCORSEnabled(opts.CORSOptions))
 
 	// Authentication details middleware
 	if opts.AuthenticationDetailsMiddleware != nil {
