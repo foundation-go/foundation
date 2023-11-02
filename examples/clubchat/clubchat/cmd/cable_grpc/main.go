@@ -1,9 +1,9 @@
 package main
 
 import (
-	f "github.com/ri-nat/foundation"
+	f "github.com/foundation-go/foundation"
 
-	cablegrpc "github.com/ri-nat/foundation/cable/grpc"
+	cablegrpc "github.com/foundation-go/foundation/cable/grpc"
 )
 
 var (

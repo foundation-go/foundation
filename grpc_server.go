@@ -9,7 +9,7 @@ import (
 	grpcm "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 
-	fg "github.com/ri-nat/foundation/grpc"
+	fg "github.com/foundation-go/foundation/grpc"
 )
 
 // GRPCServer represents a gRPC server mode Foundation service.

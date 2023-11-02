@@ -10,8 +10,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/spf13/cobra"
 
-	f "github.com/ri-nat/foundation"
-	h "github.com/ri-nat/foundation/internal/cli/helpers"
+	f "github.com/foundation-go/foundation"
+	h "github.com/foundation-go/foundation/internal/cli/helpers"
 )
 
 const (

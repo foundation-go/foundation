@@ -1,11 +1,11 @@
-module github.com/ri-nat/foundation/examples/clubchat/chats
+module github.com/foundation-go/foundation/examples/clubchat/chats
 
 go 1.21
 
-replace github.com/ri-nat/foundation => ../../../
+replace github.com/foundation-go/foundation => ../../../
 
 require (
-	github.com/ri-nat/foundation v0.0.0-00010101000000-000000000000
+	github.com/foundation-go/foundation v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.59.0
 )
 

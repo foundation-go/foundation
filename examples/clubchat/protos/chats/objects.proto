@@ -5,7 +5,7 @@ package foundation.examples.clubchat.chats;
 import "google/protobuf/timestamp.proto";
 
 option go_package =
-  "github.com/ri-nat/foundation/examples/clubchat/protos/chats";
+  "github.com/foundation-go/foundation/examples/clubchat/protos/chats";
 
 message Chat {
   string id = 1;

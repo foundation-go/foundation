@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	fhttp "github.com/ri-nat/foundation/http"
+	fhttp "github.com/foundation-go/foundation/http"
 )
 
 func TestWithAuthenticationDetails(t *testing.T) {
