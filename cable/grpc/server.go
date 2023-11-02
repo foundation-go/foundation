@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/url"
 
+	pb "github.com/foundation-go/foundation/cable/grpc/proto"
 	"github.com/google/uuid"
-	pb "github.com/ri-nat/foundation/cable/grpc/proto"
 	"github.com/sirupsen/logrus"
 )
 

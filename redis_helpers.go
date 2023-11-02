@@ -1,10 +1,10 @@
 package foundation
 
 import (
+	fredis "github.com/foundation-go/foundation/redis"
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
-	fredis "github.com/ri-nat/foundation/redis"
 )
 
 func (s *Service) GetRedis() *redis.Client {

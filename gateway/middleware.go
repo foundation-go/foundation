@@ -5,7 +5,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
-	fhttp "github.com/ri-nat/foundation/http"
+	fhttp "github.com/foundation-go/foundation/http"
 )
 
 // IncomingHeaderMatcher is the default incoming header matcher for the gateway.

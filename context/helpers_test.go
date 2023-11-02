@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	ferr "github.com/ri-nat/foundation/errors"
+	ferr "github.com/foundation-go/foundation/errors"
 	"github.com/stretchr/testify/assert"
 )
 

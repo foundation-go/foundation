@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"strings"
 
-	f "github.com/ri-nat/foundation"
-	h "github.com/ri-nat/foundation/internal/cli/helpers"
+	f "github.com/foundation-go/foundation"
+	h "github.com/foundation-go/foundation/internal/cli/helpers"
 	"github.com/spf13/cobra"
 )
 

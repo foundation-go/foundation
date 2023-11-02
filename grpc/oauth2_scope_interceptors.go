@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	fctx "github.com/ri-nat/foundation/context"
+	fctx "github.com/foundation-go/foundation/context"
 )
 
 // CheckAllScopesPresenceUnaryInterceptor checks if the context contains all specified scopes.

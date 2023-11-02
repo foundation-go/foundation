@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
+	fctx "github.com/foundation-go/foundation/context"
+	fhttp "github.com/foundation-go/foundation/http"
 	"github.com/google/uuid"
-	fctx "github.com/ri-nat/foundation/context"
-	fhttp "github.com/ri-nat/foundation/http"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )

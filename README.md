@@ -1,8 +1,8 @@
 # Foundation
 
-[![Go Build](https://github.com/ri-nat/foundation/actions/workflows/go.yml/badge.svg)](https://github.com/ri-nat/foundation/actions/workflows/go.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ri-nat/foundation)](https://goreportcard.com/report/github.com/ri-nat/foundation)
-[![License](https://img.shields.io/github/license/ri-nat/foundation)](https://opensource.org/licenses/MIT)
+[![Go Build](https://github.com/foundation-go/foundation/actions/workflows/go.yml/badge.svg)](https://github.com/foundation-go/foundation/actions/workflows/go.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/foundation-go/foundation)](https://goreportcard.com/report/github.com/foundation-go/foundation)
+[![License](https://img.shields.io/github/license/foundation-go/foundation)](https://opensource.org/licenses/MIT)
 
 > **Early Development Notice:** Foundation is currently in an early development stage. While you're welcome to explore and experiment, it's not yet ready for production use.
 
@@ -62,7 +62,7 @@ Currently, the best way to get started is by exploring the [examples](./examples
 To install the CLI tool, run:
 
 ```bash
-go install github.com/ri-nat/foundation/cmd/foundation@main
+go install github.com/foundation-go/foundation/cmd/foundation@main
 ```
 
 There are several commands available:

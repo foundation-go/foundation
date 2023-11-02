@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	fkafka "github.com/ri-nat/foundation/kafka"
-	fpg "github.com/ri-nat/foundation/postgresql"
+	fkafka "github.com/foundation-go/foundation/kafka"
+	fpg "github.com/foundation-go/foundation/postgresql"
 )
 
 func TestHealthHandler(t *testing.T) {

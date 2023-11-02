@@ -12,7 +12,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	gwruntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
-	"github.com/ri-nat/foundation/gateway"
+	"github.com/foundation-go/foundation/gateway"
 )
 
 const (

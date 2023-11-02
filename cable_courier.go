@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	cablecourier "github.com/foundation-go/foundation/cable/courier"
+	ferr "github.com/foundation-go/foundation/errors"
+	ferrpb "github.com/foundation-go/foundation/errors/proto"
+	fkafka "github.com/foundation-go/foundation/kafka"
 	"github.com/getsentry/sentry-go"
 	"github.com/redis/go-redis/v9"
-	cablecourier "github.com/ri-nat/foundation/cable/courier"
-	ferr "github.com/ri-nat/foundation/errors"
-	ferrpb "github.com/ri-nat/foundation/errors/proto"
-	fkafka "github.com/ri-nat/foundation/kafka"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )

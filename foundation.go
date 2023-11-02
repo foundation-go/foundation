@@ -10,10 +10,10 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
-	fkafka "github.com/ri-nat/foundation/kafka"
-	fpg "github.com/ri-nat/foundation/postgresql"
-	fredis "github.com/ri-nat/foundation/redis"
-	fsentry "github.com/ri-nat/foundation/sentry"
+	fkafka "github.com/foundation-go/foundation/kafka"
+	fpg "github.com/foundation-go/foundation/postgresql"
+	fredis "github.com/foundation-go/foundation/redis"
+	fsentry "github.com/foundation-go/foundation/sentry"
 )
 
 const Version = "0.2.0"
