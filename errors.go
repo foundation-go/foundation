@@ -2,8 +2,9 @@ package foundation
 
 import (
 	"errors"
+
+	ferr "github.com/foundation-go/foundation/errors"
 	"github.com/getsentry/sentry-go"
-	ferr "github.com/ri-nat/foundation/errors"
 )
 
 func (s *Service) HandleError(err ferr.FoundationError, prefix string) {

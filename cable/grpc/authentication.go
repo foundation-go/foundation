@@ -3,7 +3,7 @@ package cable_grpc
 import (
 	"context"
 
-	fhydra "github.com/ri-nat/foundation/hydra"
+	fhydra "github.com/foundation-go/foundation/hydra"
 )
 
 func HydraAuthenticationFunc(ctx context.Context, accessToken string) (userID string, err error) {

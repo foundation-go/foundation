@@ -1,4 +1,4 @@
-module github.com/ri-nat/foundation
+module github.com/foundation-go/foundation
 
 go 1.21
 

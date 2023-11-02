@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	fhttp "github.com/ri-nat/foundation/http"
+	fhttp "github.com/foundation-go/foundation/http"
 )
 
 var (

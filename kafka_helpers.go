@@ -3,8 +3,8 @@ package foundation
 import (
 	"errors"
 
+	fkafka "github.com/foundation-go/foundation/kafka"
 	"github.com/getsentry/sentry-go"
-	fkafka "github.com/ri-nat/foundation/kafka"
 	"github.com/segmentio/kafka-go"
 )
 

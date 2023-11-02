@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 
-	pb "github.com/ri-nat/foundation/errors/proto"
+	pb "github.com/foundation-go/foundation/errors/proto"
 )
 
 // BaseError is the base error type for all errors in the Foundation framework.

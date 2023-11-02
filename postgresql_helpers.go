@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"errors"
 
+	fpg "github.com/foundation-go/foundation/postgresql"
 	"github.com/getsentry/sentry-go"
-	fpg "github.com/ri-nat/foundation/postgresql"
 )
 
 func (s *Service) GetPostgreSQL() *sql.DB {

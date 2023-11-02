@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	ferr "github.com/ri-nat/foundation/errors"
+	ferr "github.com/foundation-go/foundation/errors"
 )
 
 func FoundationErrorToStatusUnaryInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
