@@ -17,7 +17,7 @@ require (
 	github.com/redis/go-redis/v9 v9.3.0
 	github.com/segmentio/kafka-go v0.4.44
 	github.com/sirupsen/logrus v1.9.3
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231030173426-d783a09b4405
 	google.golang.org/grpc v1.59.0
