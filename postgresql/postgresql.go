@@ -106,7 +106,7 @@ func (c *Component) Name() string {
 func NewNullTimeFromPbTimestamp(timestamp *timestamppb.Timestamp) sql.NullTime {
 	result := sql.NullTime{}
 
-	if timestamp.GetSeconds() > 0 || timestamp.GetNanos() > 0 {
+	if timestamp != nil && (timestamp.GetSeconds() > 0 || timestamp.GetNanos() > 0) {
 		_ = result.Scan(timestamp.AsTime())
 	}
 
