@@ -9,7 +9,6 @@ import (
 	ferrpb "github.com/foundation-go/foundation/errors/proto"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	"github.com/getsentry/sentry-go"
-	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,7 +40,7 @@ type CableMessageEventHandler struct {
 	// Resolver is used to resolve the stream name for a given event.
 	Resolver     CableMessageResolver
 	Logger       *logrus.Entry
-	Redis        *redis.Client
+	Service      *Service
 	RedisChannel string
 }
 
@@ -83,7 +82,7 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 			handlers[protoObj] = append(handlers[protoObj], &CableMessageEventHandler{
 				Resolver:     resolver,
 				Logger:       s.Logger.WithField("proto", ProtoToName(protoObj)),
-				Redis:        s.GetRedis(),
+				Service:      s,
 				RedisChannel: opts.RedisChannel,
 			})
 		}
@@ -101,6 +100,9 @@ func (c *CableCourier) Start(opts *CableCourierOptions) {
 	ewOpts := &EventsWorkerOptions{
 		ModeName: "cable_courier",
 		Handlers: opts.EventHandlers(c.Service),
+		StartComponentsOptions: []StartComponentsOption{
+			WithRedis(),
+		},
 	}
 
 	c.EventsWorker.Start(ewOpts)
@@ -128,7 +130,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 
 	// Broadcast the message to the stream.
 	// If the broadcast fails, we log the error, capture it with Sentry and go on to avoid infinite loops.
-	err = cablecourier.NewClient(h.Redis, h.RedisChannel).BroadcastMessage(
+	err = cablecourier.NewClient(h.Service.GetRedis(), h.RedisChannel).BroadcastMessage(
 		event.ProtoName,
 		msg,
 		stream,
