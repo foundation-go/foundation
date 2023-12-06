@@ -54,13 +54,13 @@ func (c *Client) publish(msg string) {
 func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stream string, correlationID string) (string, error) {
 	res, err := protojson.Marshal(msg)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal proto message: %w", err)
 	}
 
 	var data map[string]interface{}
 	err = json.Unmarshal(res, &data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to unmarshal json from proto message: %w", err)
 	}
 
 	eventData := EventData{
@@ -70,7 +70,7 @@ func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stre
 	}
 	res, err = json.Marshal(eventData)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal event data: %w", err)
 	}
 
 	type tmpWrapper struct {
@@ -80,7 +80,7 @@ func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stre
 
 	res, err = json.Marshal(tmp)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal event data wrapper: %w", err)
 	}
 
 	res = res[9 : len(res)-2]
@@ -92,7 +92,7 @@ func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stre
 
 	res, err = json.Marshal(event)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal event: %w", err)
 	}
 
 	return string(res), nil
