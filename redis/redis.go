@@ -55,12 +55,7 @@ func (c *Component) Start() error {
 
 	c.Connection = redis.NewClient(opts)
 
-	_, err = c.Connection.Ping(context.Background()).Result()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return c.Health()
 }
 
 // Stop implements the Component interface.
