@@ -55,7 +55,7 @@ func (c *Component) Start() error {
 
 	c.Connection = redis.NewClient(opts)
 
-	return nil
+	return c.Health()
 }
 
 // Stop implements the Component interface.
