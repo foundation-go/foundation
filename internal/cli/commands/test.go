@@ -33,7 +33,7 @@ var Test = &cobra.Command{
 		if cmd.Flag("opts") != nil {
 			opts = append(opts, strings.Split(cmd.Flag("opts").Value.String(), " ")...)
 		}
-		opts = append(opts, h.AtProjectRoot("..."))
+		opts = append(opts, h.AtServiceRoot("..."))
 
 		test := exec.Command("go", opts...)
 		test.Stdout = os.Stdout

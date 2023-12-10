@@ -191,6 +191,13 @@ func WithOutbox() StartComponentsOption {
 	}
 }
 
+// WithRedis sets the redis enabled flag.
+func WithRedis() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.Redis.Enabled = true
+	}
+}
+
 func (s *Service) addSystemComponents() error {
 	// Remove user-defined components in order to add system components first.
 	existedComponents := s.Components

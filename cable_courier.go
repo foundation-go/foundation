@@ -9,7 +9,6 @@ import (
 	ferrpb "github.com/foundation-go/foundation/errors/proto"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	"github.com/getsentry/sentry-go"
-	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 )
@@ -39,9 +38,10 @@ type CableCourierResolvers map[proto.Message][]CableMessageResolver
 // a CableMessageResolver to handle events.
 type CableMessageEventHandler struct {
 	// Resolver is used to resolve the stream name for a given event.
-	Resolver CableMessageResolver
-	Logger   *logrus.Entry
-	Redis    *redis.Client
+	Resolver     CableMessageResolver
+	Logger       *logrus.Entry
+	Service      *Service
+	RedisChannel string
 }
 
 // CableCourierOptions contains configuration options to instantiate a CableCourier.
@@ -49,6 +49,8 @@ type CableMessageEventHandler struct {
 type CableCourierOptions struct {
 	// Resolvers map protocol names to lists of CableMessageResolvers.
 	Resolvers map[proto.Message][]CableMessageResolver
+	// RedisChannel is the name of the Redis PubSub channel to publish events to.
+	RedisChannel string
 }
 
 // EventHandlers takes the resolvers defined in CableCourierOptions and wraps them
@@ -78,9 +80,10 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 	for protoObj, resolvers := range opts.Resolvers {
 		for _, resolver := range resolvers {
 			handlers[protoObj] = append(handlers[protoObj], &CableMessageEventHandler{
-				Resolver: resolver,
-				Logger:   s.Logger.WithField("proto", ProtoToName(protoObj)),
-				Redis:    s.GetRedis(),
+				Resolver:     resolver,
+				Logger:       s.Logger.WithField("proto", ProtoToName(protoObj)),
+				Service:      s,
+				RedisChannel: opts.RedisChannel,
 			})
 		}
 	}
@@ -90,9 +93,16 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 
 // Start runs a cable_courier worker using the given CableCourierOptions.
 func (c *CableCourier) Start(opts *CableCourierOptions) {
+	if opts != nil && opts.RedisChannel == "" {
+		opts.RedisChannel = GetEnvOrString("ANYCABLE_REDIS_CHANNEL", "__anycable__")
+	}
+
 	ewOpts := &EventsWorkerOptions{
 		ModeName: "cable_courier",
 		Handlers: opts.EventHandlers(c.Service),
+		StartComponentsOptions: []StartComponentsOption{
+			WithRedis(),
+		},
 	}
 
 	c.EventsWorker.Start(ewOpts)
@@ -106,7 +116,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 		// We don't want the event_worker to broadcast any errors from the cable_courier
 		// in order to avoid infinite loops of error messages. Instead, we log the error
 		// and capture it with Sentry.
-		err := fmt.Errorf("failed to get stream for event: %w", err)
+		err = fmt.Errorf("failed to get stream for event: %w", err)
 		sentry.CaptureException(err)
 		h.Logger.Error(err)
 
@@ -119,12 +129,20 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 	}
 
 	// Broadcast the message to the stream.
-	cablecourier.NewClient(h.Redis).BroadcastMessage(
+	// If the broadcast fails, we log the error, capture it with Sentry and go on to avoid infinite loops.
+	err = cablecourier.NewClient(h.Service.GetRedis(), h.RedisChannel).BroadcastMessage(
 		event.ProtoName,
 		msg,
 		stream,
 		event.Headers[fkafka.HeaderCorrelationID],
 	)
+	if err != nil {
+		err = fmt.Errorf("failed to broadcast message: %w", err)
+		sentry.CaptureException(err)
+		h.Logger.Error(err)
+
+		return nil, nil
+	}
 
 	return nil, nil
 }

@@ -36,7 +36,7 @@ var DBMigrate = &cobra.Command{
 				log.Fatal("This command must be run from inside a Foundation project")
 			}
 
-			dir = h.AtProjectRoot(MigrationsDirectory)
+			dir = h.AtServiceRoot(MigrationsDirectory)
 		}
 
 		// Check if migrations directory exists

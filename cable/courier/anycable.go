@@ -11,11 +11,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// RedisChannel is a name of redis channel used by AnyCable
-//
-// TODO: Make configurable via `ANYCABLE_REDIS_CHANNEL`
-const RedisChannel = "__anycable__"
-
 type Command struct {
 	Command string `json:"command"`
 	Data    string `json:"data"`
@@ -33,43 +28,61 @@ type EventData struct {
 }
 
 type Client struct {
-	Redis *redis.Client
+	Redis        *redis.Client
+	RedisChannel string
 }
 
-func NewClient(rdc *redis.Client) *Client {
-	return &Client{Redis: rdc}
+func NewClient(rdc *redis.Client, redisChannel string) *Client {
+	return &Client{Redis: rdc, RedisChannel: redisChannel}
 }
 
-func (c *Client) BroadcastMessage(msgName string, msg proto.Message, stream, correlationID string) {
-	msgJSON := newEventJSONFromMessage(msgName, msg, stream, correlationID)
+func (c *Client) BroadcastMessage(msgName string, msg proto.Message, stream, correlationID string) error {
+	msgJSON, err := newEventJSONFromMessage(msgName, msg, stream, correlationID)
+	if err != nil {
+		return fmt.Errorf("failed to marshal anycable message: %w", err)
+	}
+
 	c.publish(msgJSON)
+
+	return nil
 }
 
 func (c *Client) publish(msg string) {
-	c.Redis.Publish(context.Background(), RedisChannel, msg)
+	c.Redis.Publish(context.Background(), c.RedisChannel, msg)
 }
 
-// I'm really sorry about loads of `_` in this function. Proper error handling seemed too much for this task at the moment.
-// Nevertheless, it should just work if not touched, trust me :)
-//
-// TODO: Add proper error handling
-func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stream string, correlationID string) string {
-	res, _ := protojson.Marshal(msg)
+func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stream string, correlationID string) (string, error) {
+	res, err := protojson.Marshal(msg)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal proto message: %w", err)
+	}
+
 	var data map[string]interface{}
-	_ = json.Unmarshal(res, &data)
+	err = json.Unmarshal(res, &data)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal json from proto message: %w", err)
+	}
 
 	eventData := EventData{
 		Event:         msgName,
 		Data:          data,
 		CorrelationID: correlationID,
 	}
-	res, _ = json.Marshal(eventData)
+	res, err = json.Marshal(eventData)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal event data: %w", err)
+	}
 
 	type tmpWrapper struct {
 		Data string `json:"data"`
 	}
 	tmp := tmpWrapper{string(res)}
-	res, _ = json.Marshal(tmp)
+
+	res, err = json.Marshal(tmp)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal event data wrapper: %w", err)
+	}
+
 	res = res[9 : len(res)-2]
 
 	event := &Event{
@@ -77,6 +90,10 @@ func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stre
 		Data:   fmt.Sprintf("\"%s\"", string(res)),
 	}
 
-	res, _ = json.Marshal(event)
-	return string(res)
+	res, err = json.Marshal(event)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	return string(res), nil
 }

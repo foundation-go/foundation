@@ -21,7 +21,7 @@ var Start = &cobra.Command{
 		}
 
 		// Read all subdirectories under the cmd directory
-		files, err := os.ReadDir(h.AtProjectRoot("cmd"))
+		files, err := os.ReadDir(h.AtServiceRoot("cmd"))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -45,7 +45,7 @@ var Start = &cobra.Command{
 		}
 
 		// Run the service
-		svc := exec.Command("go", "run", h.AtProjectRoot("cmd", binaryName))
+		svc := exec.Command("go", "run", h.AtServiceRoot("cmd", binaryName))
 		svc.Stdout = os.Stdout
 		svc.Stderr = os.Stderr
 		if err = svc.Run(); err != nil {
