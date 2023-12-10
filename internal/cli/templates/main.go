@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 var (
@@ -42,7 +43,8 @@ func ReadTemplate(name string) (*template.Template, error) {
 	}
 
 	fnMap := template.FuncMap{
-		"Title": cases.Title,
+		"Title": cases.Title(language.English).String,
+		"Lower": cases.Lower(language.English).String, 
 	}
 
 	tmpl, err := template.New(name).Funcs(fnMap).Parse(string(tmplContent))
