@@ -112,7 +112,9 @@ func newEntity(input *newInput, entity string, files []string) {
 func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout})
 	New.Flags().StringP("name", "n", "", "Name of the new application or service")
-	New.MarkFlagRequired("name")
+	if err := New.MarkFlagRequired("name"); err != nil {
+		log.Fatal().Err(err)
+	}
 
 	New.Flags().BoolP("app", "a", false, "Create a new application")
 	New.Flags().BoolP("service", "s", false, "Create a new service")

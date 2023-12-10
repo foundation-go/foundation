@@ -62,5 +62,7 @@ var DBMigrate = &cobra.Command{
 
 func init() {
 	DBMigrate.Flags().StringP("dir", "d", MigrationsDirectory, "Directory containing migrations (only applicable in production)")
-	DBMigrate.MarkFlagDirname("dir")
+	if err := DBMigrate.MarkFlagDirname("dir"); err != nil {
+		log.Fatal(err)
+	}
 }

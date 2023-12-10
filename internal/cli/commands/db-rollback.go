@@ -68,6 +68,9 @@ var DBRollback = &cobra.Command{
 
 func init() {
 	DBRollback.Flags().StringP("dir", "d", MigrationsDirectory, "Directory containing migrations (only applicable in production)")
-	DBRollback.MarkFlagDirname("dir")
+	if err := DBRollback.MarkFlagDirname("dir"); err != nil {
+		log.Fatal(err)
+	}
+
 	DBRollback.Flags().Int32P("steps", "s", 1, "Number of migrations to rollback")
 }
