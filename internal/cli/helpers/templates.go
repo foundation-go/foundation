@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"text/template"
+
+	"golang.org/x/text/cases"
 )
 
 func CreateFromTemplate(dir string, tmplFolder string, tmplName string, input interface{}) error {
@@ -39,7 +41,11 @@ func ReadTemplate(name string) (*template.Template, error) {
 		return nil, err
 	}
 
-	tmpl, err := template.New(name).Parse(string(buf[:n]))
+	fnMap := template.FuncMap{
+		"Title": cases.Title,
+	}
+
+	tmpl, err := template.New(name).Funcs(fnMap).Parse(string(buf[:n]))
 	if err != nil {
 		return nil, err
 	}

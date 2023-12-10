@@ -3,22 +3,33 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/ri-nat/foundation/internal/cli/helpers"
+	f "github.com/foundation-go/foundation"
+	"github.com/foundation-go/foundation/internal/cli/helpers"
 )
 
 type newInput struct {
-	Name string
+	FoundationVersion string
+	Name              string
 }
 
 var (
 	newAppFiles = []string{
 		"README.md",
 		".gitignore",
+		"foundation.toml",
+	}
+
+	newServiceFiles = []string{
+		"README.md",
+		"go.mod",
+		"cmd/api/main.go",
 	}
 )
 
@@ -33,12 +44,12 @@ var New = &cobra.Command{
 		}
 
 		input := &newInput{
-			Name: cmd.Flag("name").Value.String(),
+			FoundationVersion: f.Version,
+			Name:              cmd.Flag("name").Value.String(),
 		}
 
 		if serviceFlag {
-			// TODO: Create a new service
-			log.Fatal().Msg("Service creation is not yet supported")
+			newService(input)
 		} else {
 			newApplication(input)
 		}
@@ -46,10 +57,32 @@ var New = &cobra.Command{
 }
 
 func newApplication(input *newInput) {
-	log.Info().Msg(fmt.Sprintf("Creating a new Foundation application `%s`", input.Name))
-	log.Info().Msg("")
+	newEntity(input, "application", newAppFiles)
 
-	// TODO: check if we're in a git repository (stop if yes)
+	if helpers.InGitRepository() {
+		log.Info().Msg("Git repository already exists, skipping initialization")
+	} else if err := helpers.RunCommand(input.Name, "git", "init"); err != nil {
+		log.Fatal().Err(err)
+	}
+}
+
+func newService(input *newInput) {
+	appRoot := helpers.GetApplicationRoot()
+
+	if err := os.Chdir(appRoot); err != nil {
+		log.Fatal().Err(err)
+	}
+
+	newEntity(input, "service", newServiceFiles)
+
+	if err := helpers.RunCommand(input.Name, "go", "mod", "tidy"); err != nil {
+		log.Fatal().Err(err)
+	}
+}
+
+func newEntity(input *newInput, entity string, files []string) {
+	log.Info().Msg(fmt.Sprintf("Creating a new Foundation %s `%s`", entity, input.Name))
+	log.Info().Msg("")
 
 	if _, err := os.Stat(input.Name); !os.IsNotExist(err) {
 		log.Fatal().Msg(fmt.Sprintf("Directory `%s` already exists", input.Name))
@@ -60,17 +93,19 @@ func newApplication(input *newInput) {
 	}
 
 	log.Info().Msg("Creating files:")
-	for _, file := range newAppFiles {
-		if err := helpers.CreateFromTemplate(input.Name, "app", file, input); err != nil {
+	for _, file := range files {
+		if strings.Contains(file, "/") {
+			dir := filepath.Dir(file)
+			if err := os.MkdirAll(filepath.Join(input.Name, dir), 0755); err != nil {
+				log.Fatal().Err(err)
+			}
+		}
+
+		if err := helpers.CreateFromTemplate(input.Name, "service", file, input); err != nil {
 			log.Fatal().Err(err)
 		}
 
 		log.Info().Msg(fmt.Sprintf(" - %s", file))
-	}
-
-	// Initialize git repository
-	if err := helpers.RunCommand(input.Name, "git", "init"); err != nil {
-		log.Fatal().Err(err)
 	}
 }
 
@@ -79,7 +114,7 @@ func init() {
 	New.Flags().StringP("name", "n", "", "Name of the new application or service")
 	New.MarkFlagRequired("name")
 
-	New.Flags().BoolP("app", "a", true, "Create a new application")
+	New.Flags().BoolP("app", "a", false, "Create a new application")
 	New.Flags().BoolP("service", "s", false, "Create a new service")
 	New.MarkFlagsMutuallyExclusive("app", "service")
 }
