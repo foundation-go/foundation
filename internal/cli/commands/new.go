@@ -12,6 +12,7 @@ import (
 
 	f "github.com/foundation-go/foundation"
 	"github.com/foundation-go/foundation/internal/cli/helpers"
+	"github.com/foundation-go/foundation/internal/cli/templates"
 )
 
 type newInput struct {
@@ -27,9 +28,9 @@ var (
 	}
 
 	newServiceFiles = []string{
+		".env.example",
 		"README.md",
-		"go.mod",
-		"cmd/api/main.go",
+		"cmd/grpc/main.go",
 	}
 )
 
@@ -75,7 +76,15 @@ func newService(input *newInput) {
 
 	newEntity(input, "service", newServiceFiles)
 
+	if err := helpers.RunCommand(input.Name, "go", "mod", "init"); err != nil {
+		log.Fatal().Err(err)
+	}
+
 	if err := helpers.RunCommand(input.Name, "go", "mod", "tidy"); err != nil {
+		log.Fatal().Err(err)
+	}
+
+	if err := helpers.RunCommand(input.Name, "cp", ".env.example", ".env"); err != nil {
 		log.Fatal().Err(err)
 	}
 }
@@ -101,7 +110,7 @@ func newEntity(input *newInput, entity string, files []string) {
 			}
 		}
 
-		if err := helpers.CreateFromTemplate(input.Name, "service", file, input); err != nil {
+		if err := templates.CreateFromTemplate(input.Name, entity, file, input); err != nil {
 			log.Fatal().Err(err)
 		}
 

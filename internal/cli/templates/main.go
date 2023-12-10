@@ -1,6 +1,7 @@
-package helpers
+package templates
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"text/template"
@@ -8,44 +9,43 @@ import (
 	"golang.org/x/text/cases"
 )
 
+var (
+	//go:embed application application/.gitignore.tmpl
+	//go:embed service service/.env.example.tmpl
+	fileTemplates embed.FS
+)
+
 func CreateFromTemplate(dir string, tmplFolder string, tmplName string, input interface{}) error {
 	file, err := os.Create(dir + "/" + tmplName)
 	if err != nil {
-		return fmt.Errorf("failed to create file `%s`: %v", tmplName, err)
+		return fmt.Errorf("failed to create file `%s`: %w", tmplName, err)
 	}
 	defer file.Close()
 
 	tmpl, err := ReadTemplate(tmplFolder + "/" + tmplName)
 	if err != nil {
-		return fmt.Errorf("failed to read template: %v", err)
+		return fmt.Errorf("failed to read template: %w", err)
 	}
 
 	err = tmpl.Execute(file, input)
 	if err != nil {
-		return fmt.Errorf("failed to execute template: %v", err)
+		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return nil
 }
 
 func ReadTemplate(name string) (*template.Template, error) {
-	file, err := os.Open("internal/cli/templates/" + name + ".tmpl")
+	tmplContent, err := fileTemplates.ReadFile(name + ".tmpl")
 	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	buf := make([]byte, 1024)
-	n, err := file.Read(buf)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read template: %w", err)
 	}
 
 	fnMap := template.FuncMap{
 		"Title": cases.Title,
 	}
 
-	tmpl, err := template.New(name).Funcs(fnMap).Parse(string(buf[:n]))
+	tmpl, err := template.New(name).Funcs(fnMap).Parse(string(tmplContent))
 	if err != nil {
 		return nil, err
 	}
