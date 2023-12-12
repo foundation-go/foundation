@@ -17,7 +17,7 @@ var Test = &cobra.Command{
 	Short:   "Run tests",
 	Run: func(cmd *cobra.Command, _ []string) {
 		if !h.BuiltOnFoundation() {
-			log.Fatal("This command must be run from inside a Foundation project")
+			log.Fatal("This command must be run from inside a Foundation service")
 		}
 
 		if f.IsProductionEnv() {

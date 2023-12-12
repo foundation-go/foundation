@@ -17,7 +17,7 @@ var Start = &cobra.Command{
 	Short:   "Start a service",
 	Run: func(_ *cobra.Command, _ []string) {
 		if !h.BuiltOnFoundation() {
-			log.Fatal("This command must be run from inside a Foundation project")
+			log.Fatal("This command must be run from inside a Foundation service")
 		}
 
 		// Read all subdirectories under the cmd directory

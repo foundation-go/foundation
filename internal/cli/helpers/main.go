@@ -3,6 +3,7 @@ package helpers
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,21 +78,12 @@ func GetApplicationRoot() string {
 }
 
 func findApplicationRoot(path string) (string, error) {
-	for {
-		foundationToml := filepath.Join(path, "foundation.toml")
-		if _, err := os.Stat(foundationToml); err == nil {
-			return path, nil
-		}
-
-		parent := filepath.Dir(path)
-		if parent == path {
-			break // we've reached the root directory
-		}
-
-		path = parent
+	foundationToml, err := FindFoundationToml(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to find foundation.toml: %w", err)
 	}
 
-	return "", errors.New("can't find application root")
+	return filepath.Dir(foundationToml), nil
 }
 
 // FindFoundationToml finds the closest foundation.toml file by traversing up the directory tree.
@@ -111,7 +103,7 @@ func FindFoundationToml(path string) (string, error) {
 		path = parent
 	}
 
-	return "", errors.New("can't find foundation.toml")
+	return "", errors.New("no `foundation.toml` file present in the current directory or any of its parents")
 }
 
 // checkFoundationDep checks whether the given go.mod file lists Foundation as a dependency.
@@ -161,12 +153,7 @@ func RunCommand(dir string, name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Run()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cmd.Run()
 }
 
 func InGitRepository() bool {

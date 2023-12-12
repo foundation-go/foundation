@@ -30,7 +30,7 @@ var DBRollback = &cobra.Command{
 			}
 		} else {
 			if !h.BuiltOnFoundation() {
-				log.Fatal("This command must be run from inside a Foundation project")
+				log.Fatal("This command must be run from inside a Foundation service")
 			}
 
 			dir = h.AtServiceRoot(MigrationsDirectory)

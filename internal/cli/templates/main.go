@@ -39,17 +39,17 @@ func CreateFromTemplate(dir string, tmplFolder string, tmplName string, input in
 func ReadTemplate(name string) (*template.Template, error) {
 	tmplContent, err := fileTemplates.ReadFile(name + ".tmpl")
 	if err != nil {
-		return nil, fmt.Errorf("failed to read template: %w", err)
+		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	fnMap := template.FuncMap{
 		"Title": cases.Title(language.English).String,
-		"Lower": cases.Lower(language.English).String, 
+		"Lower": cases.Lower(language.English).String,
 	}
 
 	tmpl, err := template.New(name).Funcs(fnMap).Parse(string(tmplContent))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	return tmpl, nil
