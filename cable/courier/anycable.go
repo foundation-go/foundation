@@ -42,13 +42,16 @@ func (c *Client) BroadcastMessage(msgName string, msg proto.Message, stream, cor
 		return fmt.Errorf("failed to marshal anycable message: %w", err)
 	}
 
-	c.publish(msgJSON)
+	err = c.publish(msgJSON)
+	if err != nil {
+		return fmt.Errorf("failed to publish anycable message: %w", err)
+	}
 
 	return nil
 }
 
-func (c *Client) publish(msg string) {
-	c.Redis.Publish(context.Background(), c.RedisChannel, msg)
+func (c *Client) publish(msg string) error {
+	return c.Redis.Publish(context.Background(), c.RedisChannel, msg).Err()
 }
 
 func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stream string, correlationID string) (string, error) {

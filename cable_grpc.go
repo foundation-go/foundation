@@ -6,9 +6,8 @@ import (
 
 	cablegrpc "github.com/foundation-go/foundation/cable/grpc"
 	pb "github.com/foundation-go/foundation/cable/grpc/proto"
-	fg "github.com/foundation-go/foundation/grpc"
 	"github.com/getsentry/sentry-go"
-	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpcm "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 )
 
@@ -64,15 +63,20 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	// Default interceptors
 	//
 	// TODO: Work correctly with interceptors from s.Options
-	interceptors := []grpc.UnaryServerInterceptor{
-		fg.LoggingUnaryInterceptor(s.Logger),
-	}
-	chainedInterceptor := grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(interceptors...))
-	s.Options.GRPCServerOptions = append(s.Options.GRPCServerOptions, chainedInterceptor)
+	// N.B.: Interceptors are executed in the order they are defined.
+	defaultInterceptors := grpc.UnaryInterceptor(grpcm.ChainUnaryServer(
+		cablegrpc.LoggingUnaryInterceptor(s.Logger),
+	))
+
+	// Construct the default server options
+	defaultOptions := []grpc.ServerOption{defaultInterceptors}
+
+	// Prepend the default server options in front of the application-defined ones
+	serverOptions := append(defaultOptions, s.Options.GRPCServerOptions...)
 
 	// Start the server
 	listener := s.acquireListener()
-	server := grpc.NewServer(s.Options.GRPCServerOptions...)
+	server := grpc.NewServer(serverOptions...)
 
 	pb.RegisterRPCServer(server, &cablegrpc.Server{
 		Channels:           s.Options.Channels,
