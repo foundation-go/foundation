@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	pb "github.com/foundation-go/foundation/cable/grpc/proto"
 	"github.com/google/uuid"
@@ -21,6 +22,11 @@ const (
 	CmdPing        = "ping"
 	CmdSubscribe   = "subscribe"
 	CmdUnsubscribe = "unsubscribe"
+
+	WelcomeMessage                     = `{"type": "welcome"}`
+	ConnectionUnauthorizedMessage      = `{"type":"disconnect", "reason":"unauthorized", "reconnect": false}`
+	ConfirmSubscriptionMessageTemplate = `{"identifier": "%s", "type": "confirm_subscription"}`
+	RejectSubscriptionMessageTemplate  = `{"identifier": "%s", "type": "reject_subscription"}`
 )
 
 // Channel represents a single communication path, supporting authorization and multiple streams subscription
@@ -57,8 +63,9 @@ func (s *Server) Connect(ctx context.Context, in *pb.ConnectionRequest) (*pb.Con
 	s.Logger.WithField("url", in.Env.Url).Debug("Connect received")
 
 	unauthenticatedResp := &pb.ConnectionResponse{
-		Status:   pb.Status_FAILURE,
-		ErrorMsg: "Unauthenticated",
+		Status:        pb.Status_FAILURE,
+		ErrorMsg:      "Unauthenticated",
+		Transmissions: []string{ConnectionUnauthorizedMessage},
 	}
 
 	var accessToken string
@@ -109,7 +116,9 @@ func (s *Server) Connect(ctx context.Context, in *pb.ConnectionRequest) (*pb.Con
 			Cstate: cState,
 			Istate: in.Env.Istate,
 		},
+		Transmissions: []string{WelcomeMessage},
 	}
+
 	return resp, nil
 }
 
@@ -140,13 +149,17 @@ func (s *Server) Command(ctx context.Context, in *pb.CommandMessage) (*pb.Comman
 	case CmdMessage: // Just skip for now
 		return resp, nil
 	case CmdSubscribe:
+		escapedIdentifier := strconv.Quote(in.Identifier)
+		escapedIdentifier = escapedIdentifier[1 : len(escapedIdentifier)-1]
+
 		ch, err := s.channelFromIdent(ident)
 		if err != nil {
 			s.Logger.WithError(err).Error("Channel not found")
 
 			return &pb.CommandResponse{
-				Status:   pb.Status_FAILURE,
-				ErrorMsg: err.Error(),
+				Status:        pb.Status_FAILURE,
+				ErrorMsg:      "Channel not found",
+				Transmissions: []string{fmt.Sprintf(RejectSubscriptionMessageTemplate, escapedIdentifier)},
 			}, nil
 		}
 
@@ -154,12 +167,14 @@ func (s *Server) Command(ctx context.Context, in *pb.CommandMessage) (*pb.Comman
 			s.Logger.WithError(err).Debug("Authorization failed")
 
 			return &pb.CommandResponse{
-				Status:   pb.Status_FAILURE,
-				ErrorMsg: "Permission denied",
+				Status:        pb.Status_FAILURE,
+				ErrorMsg:      "Permission denied",
+				Transmissions: []string{fmt.Sprintf(RejectSubscriptionMessageTemplate, escapedIdentifier)},
 			}, nil
 		}
 
 		resp.Streams = ch.GetStreams(ctx, in.Env.Cstate[UserIDKey], ident)
+		resp.Transmissions = []string{fmt.Sprintf(ConfirmSubscriptionMessageTemplate, escapedIdentifier)}
 
 		return resp, nil
 	case CmdUnsubscribe:
