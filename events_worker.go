@@ -16,7 +16,7 @@ import (
 )
 
 type EventsWorker struct {
-	*Worker
+	*SpinWorker
 
 	protoNamesToMessages map[string]proto.Message
 }
@@ -36,7 +36,7 @@ type EventsWorkerOptions struct {
 
 func InitEventsWorker(name string) *EventsWorker {
 	return &EventsWorker{
-		Worker: InitWorker(name),
+		SpinWorker: InitSpinWorker(name),
 	}
 }
 
@@ -95,7 +95,7 @@ func (opts *EventsWorkerOptions) ProtoNamesToMessages() map[string]proto.Message
 func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 	w.protoNamesToMessages = opts.ProtoNamesToMessages()
 
-	wOpts := NewWorkerOptions()
+	wOpts := NewSpinWorkerOptions()
 	wOpts.ModeName = opts.ModeName
 	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
@@ -103,7 +103,7 @@ func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 		WithKafkaConsumerTopics(opts.GetTopics()...),
 	)
 
-	w.Worker.Start(wOpts)
+	w.SpinWorker.Start(wOpts)
 }
 
 func newEventFromKafkaMessage(msg *kafka.Message) *Event {

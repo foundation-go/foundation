@@ -10,6 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
+	fenq "github.com/foundation-go/foundation/enqueuer"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	fpg "github.com/foundation-go/foundation/postgresql"
 	fredis "github.com/foundation-go/foundation/redis"
@@ -39,6 +40,7 @@ type Config struct {
 	Outbox       *OutboxConfig
 	Redis        *RedisConfig
 	Sentry       *SentryConfig
+	Enqueuer     *EnqueuerConfig
 }
 
 // DatabaseConfig represents the configuration of a PostgreSQL database.
@@ -107,6 +109,12 @@ type RedisConfig struct {
 	URL     string
 }
 
+// EnqueuerConfig represents the configuration of an Enqueur client.
+type EnqueuerConfig struct {
+	Enabled bool
+	URL     string
+}
+
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
@@ -147,6 +155,10 @@ func NewConfig() *Config {
 		Sentry: &SentryConfig{
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
 			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
+		},
+		Enqueuer: &EnqueuerConfig{
+			Enabled: len(GetEnvOrString("ENQUEUER_URL", "")) > 0,
+			URL:     GetEnvOrString("ENQUEUER_URL", ""),
 		},
 	}
 }
@@ -195,6 +207,13 @@ func WithOutbox() StartComponentsOption {
 func WithRedis() StartComponentsOption {
 	return func(s *Service) {
 		s.Config.Redis.Enabled = true
+	}
+}
+
+// WithEnqueuer sets the enqueuer enabled flag.
+func WithEnqueuer() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.Enqueuer.Enabled = true
 	}
 }
 
@@ -251,6 +270,13 @@ func (s *Service) addSystemComponents() error {
 		s.Components = append(s.Components, fredis.NewComponent(
 			fredis.WithLogger(s.Logger),
 			fredis.WithURL(s.Config.Redis.URL),
+		))
+	}
+
+	if s.Config.Enqueuer.Enabled {
+		s.Components = append(s.Components, fenq.NewComponent(
+			fenq.WithLogger(s.Logger),
+			fenq.WithURL(s.Config.Enqueuer.URL),
 		))
 	}
 
