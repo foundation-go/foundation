@@ -33,10 +33,13 @@ func InitJobsWorker(name string) *JobsWorker {
 
 // JobsWorkerOptions represents the options for starting an events worker
 type JobsWorkerOptions struct {
-	JobHandlers    map[string]func(job *work.Job) error
+	// JobHandlers are the handlers to use for the jobs
+	JobHandlers map[string]func(job *work.Job) error
+	// JobMiddlewares are the middlewares to use for all jobs
 	JobMiddlewares []func(job *work.Job, next work.NextMiddlewareFunc) error
-	CronJobs       map[string]string
-	// Namespace is the namespace to use for the jobs
+	// CronJobs are the scheduling for the jobs from JobHandlers
+	CronJobs map[string]string
+	// Namespace is the redis namespace to use for the jobs
 	Namespace string
 	// Concurrency is the number of concurrent jobs to run
 	Concurrency int
@@ -63,9 +66,9 @@ func (w *JobsWorker) Start(opts *JobsWorkerOptions) {
 }
 
 func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
-	redisUrl := GetEnvOrString("REDIS_URL", "")
+	redisUrl := GetEnvOrString("JOBS_REDIS_URL", "")
 	if redisUrl == "" {
-		return fmt.Errorf("REDIS_URL is required")
+		return fmt.Errorf("JOBS_REDIS_URL is required")
 	}
 
 	var redisPool = &redis.Pool{

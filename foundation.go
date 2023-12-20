@@ -10,7 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
-	fenq "github.com/foundation-go/foundation/enqueuer"
+	fenq "github.com/foundation-go/foundation/jobs"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	fpg "github.com/foundation-go/foundation/postgresql"
 	fredis "github.com/foundation-go/foundation/redis"
@@ -40,7 +40,7 @@ type Config struct {
 	Outbox       *OutboxConfig
 	Redis        *RedisConfig
 	Sentry       *SentryConfig
-	Enqueuer     *EnqueuerConfig
+	JobsEnqueuer *JobsEnqueuerConfig
 }
 
 // DatabaseConfig represents the configuration of a PostgreSQL database.
@@ -109,8 +109,8 @@ type RedisConfig struct {
 	URL     string
 }
 
-// EnqueuerConfig represents the configuration of an Enqueur client.
-type EnqueuerConfig struct {
+// JobsEnqueuerConfig represents the configuration of a jobs enqueuer.
+type JobsEnqueuerConfig struct {
 	Enabled bool
 	URL     string
 }
@@ -156,9 +156,9 @@ func NewConfig() *Config {
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
 			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
 		},
-		Enqueuer: &EnqueuerConfig{
-			Enabled: len(GetEnvOrString("ENQUEUER_URL", "")) > 0,
-			URL:     GetEnvOrString("ENQUEUER_URL", ""),
+		JobsEnqueuer: &JobsEnqueuerConfig{
+			Enabled: len(GetEnvOrString("JOBS_REDIS_URL", "")) > 0,
+			URL:     GetEnvOrString("JOBS_REDIS_URL", ""),
 		},
 	}
 }
@@ -210,10 +210,10 @@ func WithRedis() StartComponentsOption {
 	}
 }
 
-// WithEnqueuer sets the enqueuer enabled flag.
-func WithEnqueuer() StartComponentsOption {
+// WithJobsEnqueuer sets the jobs enqueuer enabled flag.
+func WithJobsEnqueuer() StartComponentsOption {
 	return func(s *Service) {
-		s.Config.Enqueuer.Enabled = true
+		s.Config.JobsEnqueuer.Enabled = true
 	}
 }
 
@@ -273,10 +273,10 @@ func (s *Service) addSystemComponents() error {
 		))
 	}
 
-	if s.Config.Enqueuer.Enabled {
+	if s.Config.JobsEnqueuer.Enabled {
 		s.Components = append(s.Components, fenq.NewComponent(
 			fenq.WithLogger(s.Logger),
-			fenq.WithURL(s.Config.Enqueuer.URL),
+			fenq.WithURL(s.Config.JobsEnqueuer.URL),
 		))
 	}
 

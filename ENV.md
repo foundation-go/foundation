@@ -30,6 +30,12 @@ The following environment variables are only applicable when running in `events_
 - `EVENTS_WORKER_ERRORS_TOPIC`: The Kafka topic to publish errors to. Default: `foundation.events_worker.errors`.
 - `EVENTS_WORKER_DELIVER_ERRORS`: Whether to deliver errors to the `EVENTS_WORKER_ERRORS_TOPIC`. Default: `true`.
 
+## Jobs Worker
+
+The following environment variables are only applicable when running in `jobs_worker` mode.
+
+- `JOBS_REDIS_URL`: The URL of the Redis instance to use for jobs. Must be set when using the `jobs_worker` mode.
+
 ## gRPC
 
 - `GRPC_TLS_DIR`: The directory containing the TLS certificates for gRPC. Leave empty to disable TLS.

@@ -1,4 +1,4 @@
-package enqueuer
+package jobs
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ComponentName = "enqueuer"
+	ComponentName = "jobs-enqueuer"
 )
 
 const (
@@ -29,28 +29,28 @@ type Component struct {
 // ComponentOption is an option to `Component`.
 type ComponentOption func(*Component)
 
-// WithLogger sets the logger for the Redis component.
+// WithLogger sets the logger for the JobsEnqueuer component
 func WithLogger(logger *logrus.Entry) ComponentOption {
 	return func(c *Component) {
 		c.logger = logger.WithField("component", c.Name())
 	}
 }
 
-// WithURL sets the database URL for the Redis component.
+// WithURL sets the database URL for the JobsEnqueuer component.
 func WithURL(url string) ComponentOption {
 	return func(c *Component) {
 		c.url = url
 	}
 }
 
-// WithPoolSize sets the pool size for the Redis component.
+// WithPoolSize sets the pool size for the JobsEnqueuer component.
 func WithPoolSize(poolSize int) ComponentOption {
 	return func(c *Component) {
 		c.poolSize = poolSize
 	}
 }
 
-// WithNamespace sets the namespace for enqueuer.
+// WithNamespace sets the namespace for JobsEnqueuer component.
 func WithNamespace(namespace string) ComponentOption {
 	return func(c *Component) {
 		c.namespace = namespace
@@ -91,7 +91,7 @@ func (c *Component) Start() error {
 
 // Stop implements the Component interface.
 func (c *Component) Stop() error {
-	c.logger.Info("Disconnecting from Redis...")
+	c.logger.Info("Disconnecting jobs enqueuer from redis...")
 
 	return c.Enqueuer.Pool.Close()
 }
@@ -99,7 +99,7 @@ func (c *Component) Stop() error {
 // Health implements the Component interface.
 func (c *Component) Health() error {
 	if c.Enqueuer.Pool == nil {
-		return fmt.Errorf("connection is not initialized")
+		return fmt.Errorf("jobs enqueuer redis connection is not initialized")
 	}
 
 	conn := c.Enqueuer.Pool.Get()
