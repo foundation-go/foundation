@@ -26,7 +26,8 @@ Foundation is built upon several proven technologies including:
   - **Gateway Mode**: Facilitate the exposure of gRPC services as HTTP endpoints, leveraging gRPC Gateway. This mode acts as a bridge, allowing HTTP clients to communicate with your gRPC microservices transparently.
   - **gRPC Mode**: Operate as a standard gRPC server, enabling high-performance RPC communication, ideal for microservices interaction.
   - **HTTP Mode**: Deploy as a traditional HTTP server, offering a more general-purpose approach for serving web requests.
-  - **Worker Mode**: This is your background worker, designed to continuously execute tasks. It offers configurability in terms of processing functions and the interval between task iterations.
+  - **Spin Worker Mode**: This is your background worker, designed to continuously execute tasks. It offers configurability in terms of processing functions and the interval between task iterations.
+  - **Jobs Worker Mode**: A mode to run background jobs with Gocraft Work. Support scheduled jobs, retrying, and concurrency.
   - **Events Worker Mode**: Building on the Worker Mode, this variant is tailored for Kafka. It ingests messages from Kafka topics and triggers associated Go function handlers.
   - **Job Mode**: Best suited for one-off operations. Think of tasks like initializing your database, running migrations, or seeding initial data.
   - **Cable gRPC Mode**: Function as an AnyCable-compatible gRPC server, ideal for real-time WebSocket functionalities without sacrificing scalability.
@@ -51,6 +52,7 @@ Foundation comes with built-in support for:
 - **gRPC Gateway**: Expose gRPC services as JSON endpoints.
 - **Kafka**: Produce and consume messages with Kafka (via `kafka-go`).
 - **AnyCable**: Implement real-time WebSocket functionalities with AnyCable.
+- **Gocraft Work**: Run background jobs with Gocraft Work.
 - **Sentry**: Report errors to Sentry.
 
 ## 🚀 Getting Started

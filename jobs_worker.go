@@ -31,14 +31,18 @@ func InitJobsWorker(name string) *JobsWorker {
 	}
 }
 
+type JobOptions struct {
+	handler  func(job *work.Job) error
+	schedule string
+	options  *work.JobOptions
+}
+
 // JobsWorkerOptions represents the options for starting a jobs worker
 type JobsWorkerOptions struct {
 	// JobHandlers are the handlers to use for the jobs
-	JobHandlers map[string]func(job *work.Job) error
+	Jobs map[string]JobOptions
 	// JobMiddlewares are the middlewares to use for all jobs
-	JobMiddlewares []func(job *work.Job, next work.NextMiddlewareFunc) error
-	// JobSchedule are the scheduling for the jobs from JobHandlers
-	JobSchedule map[string]string
+	Middlewares []func(job *work.Job, next work.NextMiddlewareFunc) error
 	// Namespace is the redis namespace to use for the jobs
 	Namespace string
 	// Concurrency is the number of concurrent jobs to run
@@ -84,24 +88,24 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 
 	workerPool.Middleware(w.Logger)
 
-	if w.Options.JobMiddlewares != nil {
-		for _, middleware := range w.Options.JobMiddlewares {
+	if w.Options.Middlewares != nil {
+		for _, middleware := range w.Options.Middlewares {
 			workerPool.Middleware(middleware)
 		}
 	}
 
-	if w.Options.JobSchedule != nil {
-		for jobName, cronSpec := range w.Options.JobSchedule {
-			if w.Options.JobHandlers[jobName] == nil {
-				return fmt.Errorf("scheduling job %s has no handler", jobName)
-			}
-
-			workerPool.PeriodicallyEnqueue(cronSpec, jobName)
+	for jobName, jobOptions := range w.Options.Jobs {
+		if jobOptions.handler == nil {
+			return fmt.Errorf("job %s has no handler", jobName)
 		}
-	}
 
-	for jobName, handler := range w.Options.JobHandlers {
-		workerPool.Job(jobName, handler)
+		if jobOptions.options != nil {
+			workerPool.JobWithOptions(jobName, *jobOptions.options, jobOptions.handler)
+		}
+
+		if jobOptions.schedule != "" {
+			workerPool.PeriodicallyEnqueue(jobOptions.schedule, jobName)
+		}
 	}
 
 	workerPool.Start()
