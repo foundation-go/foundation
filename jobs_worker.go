@@ -15,7 +15,7 @@ const (
 	defaultNamespace   = "foundation_jobs_worker"
 )
 
-// JobsWorkerContext base context for workers to use. Could be customized by the user with embedding.
+// JobsWorkerContext base context for workers to use
 type JobsWorkerContext struct {
 }
 
@@ -31,14 +31,14 @@ func InitJobsWorker(name string) *JobsWorker {
 	}
 }
 
-// JobsWorkerOptions represents the options for starting an events worker
+// JobsWorkerOptions represents the options for starting a jobs worker
 type JobsWorkerOptions struct {
 	// JobHandlers are the handlers to use for the jobs
 	JobHandlers map[string]func(job *work.Job) error
 	// JobMiddlewares are the middlewares to use for all jobs
 	JobMiddlewares []func(job *work.Job, next work.NextMiddlewareFunc) error
-	// CronJobs are the scheduling for the jobs from JobHandlers
-	CronJobs map[string]string
+	// JobSchedule are the scheduling for the jobs from JobHandlers
+	JobSchedule map[string]string
 	// Namespace is the redis namespace to use for the jobs
 	Namespace string
 	// Concurrency is the number of concurrent jobs to run
@@ -54,7 +54,7 @@ func NewJobsWorkerOptions() *JobsWorkerOptions {
 	}
 }
 
-// Start runs the worker that handles events
+// Start runs the worker that handles jobs
 func (w *JobsWorker) Start(opts *JobsWorkerOptions) {
 	w.Options = opts
 
@@ -90,10 +90,10 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 		}
 	}
 
-	if w.Options.CronJobs != nil {
-		for jobName, cronSpec := range w.Options.CronJobs {
+	if w.Options.JobSchedule != nil {
+		for jobName, cronSpec := range w.Options.JobSchedule {
 			if w.Options.JobHandlers[jobName] == nil {
-				return fmt.Errorf("cron job %s has no handler", jobName)
+				return fmt.Errorf("scheduling job %s has no handler", jobName)
 			}
 
 			workerPool.PeriodicallyEnqueue(cronSpec, jobName)
@@ -117,6 +117,7 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 
 func (w *JobsWorker) Logger(job *work.Job, next work.NextMiddlewareFunc) error {
 	w.Service.Logger.Infof("Starting job %s", job.Name)
+
 	err := next()
 	if err != nil {
 		w.Service.Logger.Errorf("Job %s failed: %v", job.Name, err)
