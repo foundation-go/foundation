@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 
 	"golang.org/x/text/cases"
@@ -17,7 +18,7 @@ var (
 )
 
 func CreateFromTemplate(dir string, tmplFolder string, tmplName string, input interface{}) error {
-	file, err := os.Create(dir + "/" + tmplName)
+	file, err := os.Create(filepath.Join(dir, tmplName))
 	if err != nil {
 		return fmt.Errorf("failed to create file `%s`: %w", tmplName, err)
 	}
