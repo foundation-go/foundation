@@ -13,8 +13,8 @@ const (
 )
 
 const (
-	defaultPoolSize  = 5
-	defaultNamespace = "foundation_jobs_worker"
+	DefaultPoolSize  = 5
+	DefaultNamespace = "__foundation_jobs__"
 )
 
 type Component struct {
@@ -70,11 +70,11 @@ func NewComponent(opts ...ComponentOption) *Component {
 // Start implements the Component interface.
 func (c *Component) Start() error {
 	if c.poolSize == 0 {
-		c.poolSize = defaultPoolSize
+		c.poolSize = DefaultPoolSize
 	}
 
 	if c.namespace == "" {
-		c.namespace = defaultNamespace
+		c.namespace = DefaultNamespace
 	}
 
 	c.Enqueuer = work.NewEnqueuer(c.namespace, &redis.Pool{

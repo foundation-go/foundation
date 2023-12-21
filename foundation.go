@@ -113,6 +113,7 @@ type RedisConfig struct {
 type JobsEnqueuerConfig struct {
 	Enabled bool
 	URL     string
+	Pool    int
 }
 
 // NewConfig returns a new Config with values populated from environment variables.
@@ -157,8 +158,9 @@ func NewConfig() *Config {
 			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
 		},
 		JobsEnqueuer: &JobsEnqueuerConfig{
-			Enabled: len(GetEnvOrString("JOBS_REDIS_URL", "")) > 0,
-			URL:     GetEnvOrString("JOBS_REDIS_URL", ""),
+			Enabled: false,
+			URL:     GetEnvOrString("REDIS_URL", ""),
+			Pool:    GetEnvOrInt("REDIS_POOL", 5),
 		},
 	}
 }
@@ -277,6 +279,7 @@ func (s *Service) addSystemComponents() error {
 		s.Components = append(s.Components, fenq.NewComponent(
 			fenq.WithLogger(s.Logger),
 			fenq.WithURL(s.Config.JobsEnqueuer.URL),
+			fenq.WithPoolSize(s.Config.JobsEnqueuer.Pool),
 		))
 	}
 

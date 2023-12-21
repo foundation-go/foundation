@@ -3,8 +3,8 @@ package foundation
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
+
+	"github.com/foundation-go/foundation/jobs"
 
 	"github.com/gocraft/work"
 	"github.com/gomodule/redigo/redis"
@@ -12,11 +12,10 @@ import (
 
 const (
 	defaultConcurrency = 5
-	defaultNamespace   = "foundation_jobs_worker"
 )
 
-// JobsWorkerContext base context for workers to use
-type JobsWorkerContext struct {
+// jobsWorkerContext base context for workers to use
+type jobsWorkerContext struct {
 }
 
 type JobsWorker struct {
@@ -53,7 +52,7 @@ type JobsWorkerOptions struct {
 
 func NewJobsWorkerOptions() *JobsWorkerOptions {
 	return &JobsWorkerOptions{
-		Namespace:   defaultNamespace,
+		Namespace:   jobs.DefaultNamespace,
 		Concurrency: defaultConcurrency,
 	}
 }
@@ -64,27 +63,22 @@ func (w *JobsWorker) Start(opts *JobsWorkerOptions) {
 
 	w.Service.Start(&StartOptions{
 		ModeName:               "jobs_worker",
-		StartComponentsOptions: w.Options.StartComponentsOptions,
+		StartComponentsOptions: append(w.Options.StartComponentsOptions, WithRedis()),
 		ServiceFunc:            w.ServiceFunc,
 	})
 }
 
 func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
-	redisUrl := GetEnvOrString("JOBS_REDIS_URL", "")
-	if redisUrl == "" {
-		return fmt.Errorf("JOBS_REDIS_URL is required")
-	}
-
 	var redisPool = &redis.Pool{
 		MaxActive: w.Options.Concurrency,
 		MaxIdle:   w.Options.Concurrency,
 		Wait:      true,
 		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisUrl)
+			return redis.Dial("tcp", w.Config.Redis.URL)
 		},
 	}
 
-	workerPool := work.NewWorkerPool(JobsWorkerContext{}, uint(w.Options.Concurrency), w.Options.Namespace, redisPool)
+	workerPool := work.NewWorkerPool(jobsWorkerContext{}, uint(w.Options.Concurrency), w.Options.Namespace, redisPool)
 
 	workerPool.Middleware(w.Logger)
 
@@ -110,9 +104,7 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 
 	workerPool.Start()
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
+	<-ctx.Done()
 
 	workerPool.Stop()
 

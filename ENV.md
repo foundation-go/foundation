@@ -7,6 +7,8 @@ The following environment variables are available for all running modes.
 - `FOUNDATION_ENV`: Application (service) environment. Default: `development`. Possible values: `development`, `production`, `test`.
 - `LOG_LEVEL`: Log level. Default: `INFO`.
 - `PORT`: Port to listen on (for server-based running modes). Default: `51051`.
+- `SENTRY_DSN`: The DSN for the Sentry service. Leave empty to disable Sentry.
+- `REDIS_URL`: The URL of the Redis instance to use for caching or communicating with Redis. Leave empty to disable.
 
 ## Authentication
 
@@ -34,7 +36,7 @@ The following environment variables are only applicable when running in `events_
 
 The following environment variables are only applicable when running in `jobs_worker` mode.
 
-- `JOBS_REDIS_URL`: The URL of the Redis instance to use for jobs. Must be set when using the `jobs_worker` mode.
+- `REDIS_URL`: The URL of the Redis instance to use for jobs. Must be set when using the `jobs_worker` mode.
 
 ## gRPC
 
