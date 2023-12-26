@@ -3,23 +3,25 @@ package helpers
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
 
-func AtProjectRoot(paths ...string) string {
-	return filepath.Join(getProjectRoot(), filepath.Join(paths...))
+func AtServiceRoot(paths ...string) string {
+	return filepath.Join(getServiceRoot(), filepath.Join(paths...))
 }
 
-// getProjectRoot returns the absolute path to the project root directory or panics if it can't be found.
-func getProjectRoot() string {
+// getServiceRoot returns the absolute path to the project root directory or panics if it can't be found.
+func getServiceRoot() string {
 	path, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
 
-	root, err := findProjectRoot(path)
+	root, err := findServiceRoot(path)
 	if err != nil {
 		panic(err)
 	}
@@ -27,7 +29,7 @@ func getProjectRoot() string {
 	return root
 }
 
-func findProjectRoot(path string) (string, error) {
+func findServiceRoot(path string) (string, error) {
 	for {
 		gomod := filepath.Join(path, "go.mod")
 		if _, err := os.Stat(gomod); err == nil {
@@ -42,23 +44,66 @@ func findProjectRoot(path string) (string, error) {
 		path = parent
 	}
 
-	return "", errors.New("can't find project root")
+	return "", errors.New("can't find service root")
 }
 
 // findGoMod finds the go.mod file by traversing up the directory tree.
 // It returns the absolute path to the go.mod file, or an error if it can't be found.
 func findGoMod(path string) (string, error) {
-	projectRoot, err := findProjectRoot(path)
+	serviceRoot, err := findServiceRoot(path)
 	if err != nil {
 		return "", err
 	}
 
-	gomod := filepath.Join(projectRoot, "go.mod")
+	gomod := filepath.Join(serviceRoot, "go.mod")
 	if _, err := os.Stat(gomod); err == nil {
 		return gomod, nil
 	}
 
 	return "", errors.New("no go.mod file found")
+}
+
+func GetApplicationRoot() string {
+	path, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	root, err := findApplicationRoot(path)
+	if err != nil {
+		panic(err)
+	}
+
+	return root
+}
+
+func findApplicationRoot(path string) (string, error) {
+	foundationToml, err := FindFoundationToml(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to find foundation.toml: %w", err)
+	}
+
+	return filepath.Dir(foundationToml), nil
+}
+
+// FindFoundationToml finds the closest foundation.toml file by traversing up the directory tree.
+// It returns the absolute path to the foundation.toml file, or an error if it can't be found.
+func FindFoundationToml(path string) (string, error) {
+	for {
+		foundationToml := filepath.Join(path, "foundation.toml")
+		if _, err := os.Stat(foundationToml); err == nil {
+			return foundationToml, nil
+		}
+
+		parent := filepath.Dir(path)
+		if parent == path {
+			break // we've reached the root directory
+		}
+
+		path = parent
+	}
+
+	return "", errors.New("no `foundation.toml` file present in the current directory or any of its parents")
 }
 
 // checkFoundationDep checks whether the given go.mod file lists Foundation as a dependency.
@@ -100,4 +145,20 @@ func BuiltOnFoundation() bool {
 	}
 
 	return true
+}
+
+func RunCommand(dir string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func InGitRepository() bool {
+	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	output, err := cmd.Output()
+
+	return err == nil && string(output) == "true\n"
 }

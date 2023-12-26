@@ -1,0 +1,32 @@
+package main
+
+import (
+	f "github.com/foundation-go/foundation"
+	ferr "github.com/foundation-go/foundation/errors"
+	pb "github.com/foundation-go/foundation/examples/clubchat/protos/chats"
+
+	"google.golang.org/grpc"
+)
+
+var (
+	svc = f.InitGRPCServer("{{.Name}}-grpc")
+)
+
+type {{.Name}}Service struct {
+	pb.Unimplemented{{.Name | Title}}Server
+}
+
+func main() {
+	// Define the options for the gRPC server
+	opts := &f.GRPCServerOptions{
+		RegisterFunc: func(s *grpc.Server) {
+			pb.Register{{.Name | Title}}Server(s, &{{.Name}}Service{})
+		},
+		StartComponentsOptions: []f.StartComponentsOption{
+			f.WithKafkaProducer(),
+		},
+	}
+
+	// Start the service
+	svc.Start(opts)
+}
