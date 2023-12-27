@@ -10,6 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
+	fjobs "github.com/foundation-go/foundation/jobs"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	fpg "github.com/foundation-go/foundation/postgresql"
 	fredis "github.com/foundation-go/foundation/redis"
@@ -39,6 +40,7 @@ type Config struct {
 	Outbox       *OutboxConfig
 	Redis        *RedisConfig
 	Sentry       *SentryConfig
+	JobsEnqueuer *JobsEnqueuerConfig
 }
 
 // DatabaseConfig represents the configuration of a PostgreSQL database.
@@ -107,6 +109,13 @@ type RedisConfig struct {
 	URL     string
 }
 
+// JobsEnqueuerConfig represents the configuration of a jobs enqueuer.
+type JobsEnqueuerConfig struct {
+	Enabled bool
+	URL     string
+	Pool    int
+}
+
 // NewConfig returns a new Config with values populated from environment variables.
 func NewConfig() *Config {
 	return &Config{
@@ -147,6 +156,11 @@ func NewConfig() *Config {
 		Sentry: &SentryConfig{
 			DSN:     GetEnvOrString("SENTRY_DSN", ""),
 			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
+		},
+		JobsEnqueuer: &JobsEnqueuerConfig{
+			Enabled: false,
+			URL:     GetEnvOrString("REDIS_URL", ""),
+			Pool:    GetEnvOrInt("REDIS_POOL", 5),
 		},
 	}
 }
@@ -195,6 +209,13 @@ func WithOutbox() StartComponentsOption {
 func WithRedis() StartComponentsOption {
 	return func(s *Service) {
 		s.Config.Redis.Enabled = true
+	}
+}
+
+// WithJobsEnqueuer sets the jobs enqueuer enabled flag.
+func WithJobsEnqueuer() StartComponentsOption {
+	return func(s *Service) {
+		s.Config.JobsEnqueuer.Enabled = true
 	}
 }
 
@@ -251,6 +272,14 @@ func (s *Service) addSystemComponents() error {
 		s.Components = append(s.Components, fredis.NewComponent(
 			fredis.WithLogger(s.Logger),
 			fredis.WithURL(s.Config.Redis.URL),
+		))
+	}
+
+	if s.Config.JobsEnqueuer.Enabled {
+		s.Components = append(s.Components, fjobs.NewComponent(
+			fjobs.WithLogger(s.Logger),
+			fjobs.WithURL(s.Config.JobsEnqueuer.URL),
+			fjobs.WithPoolSize(s.Config.JobsEnqueuer.Pool),
 		))
 	}
 
