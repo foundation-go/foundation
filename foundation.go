@@ -10,7 +10,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
 
-	fenq "github.com/foundation-go/foundation/jobs"
+	fjobs "github.com/foundation-go/foundation/jobs"
 	fkafka "github.com/foundation-go/foundation/kafka"
 	fpg "github.com/foundation-go/foundation/postgresql"
 	fredis "github.com/foundation-go/foundation/redis"
@@ -276,10 +276,10 @@ func (s *Service) addSystemComponents() error {
 	}
 
 	if s.Config.JobsEnqueuer.Enabled {
-		s.Components = append(s.Components, fenq.NewComponent(
-			fenq.WithLogger(s.Logger),
-			fenq.WithURL(s.Config.JobsEnqueuer.URL),
-			fenq.WithPoolSize(s.Config.JobsEnqueuer.Pool),
+		s.Components = append(s.Components, fjobs.NewComponent(
+			fjobs.WithLogger(s.Logger),
+			fjobs.WithURL(s.Config.JobsEnqueuer.URL),
+			fjobs.WithPoolSize(s.Config.JobsEnqueuer.Pool),
 		))
 	}
 
