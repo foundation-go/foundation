@@ -22,7 +22,7 @@ var DBMigrate = &cobra.Command{
 	Use:     "db:migrate",
 	Aliases: []string{"dbm"},
 	Short:   "Run database migrations",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, _ []string) {
 		var dir string
 		databaseURL := f.GetEnvOrString("DATABASE_URL", "")
 
@@ -33,10 +33,10 @@ var DBMigrate = &cobra.Command{
 			}
 		} else {
 			if !h.BuiltOnFoundation() {
-				log.Fatal("This command must be run from inside a Foundation project")
+				log.Fatal("This command must be run from inside a Foundation service")
 			}
 
-			dir = h.AtProjectRoot(MigrationsDirectory)
+			dir = h.AtServiceRoot(MigrationsDirectory)
 		}
 
 		// Check if migrations directory exists
@@ -62,4 +62,7 @@ var DBMigrate = &cobra.Command{
 
 func init() {
 	DBMigrate.Flags().StringP("dir", "d", MigrationsDirectory, "Directory containing migrations (only applicable in production)")
+	if err := DBMigrate.MarkFlagDirname("dir"); err != nil {
+		log.Fatal(err)
+	}
 }

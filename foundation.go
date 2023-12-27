@@ -17,7 +17,7 @@ import (
 	fsentry "github.com/foundation-go/foundation/sentry"
 )
 
-const Version = "0.2.0"
+const Version = "0.2.1"
 
 // Service represents a single microservice - part of the bigger Foundation-based application, which implements
 // an isolated domain of the application logic.

@@ -75,6 +75,7 @@ foundation db:migrate # Run database migrations
 foundation db:rollback # Rollback database migrations
 foundation start # Start the service (you will be prompted to choose a service to start)
 foundation test # Run tests
+foundation new # Create `--app` or `--service`
 ```
 
 You can also run `foundation` without any arguments to see a list of available commands, or run `foundation <command> --help` to see the available options for a specific command.

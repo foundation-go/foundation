@@ -11,6 +11,7 @@ func main() {
 	rootCmd.AddCommand(
 		c.DBMigrate,
 		c.DBRollback,
+		c.New,
 		c.Start,
 		c.Test,
 	)

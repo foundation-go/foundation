@@ -15,13 +15,13 @@ var Start = &cobra.Command{
 	Use:     "start",
 	Aliases: []string{"s"},
 	Short:   "Start a service",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		if !h.BuiltOnFoundation() {
-			log.Fatal("This command must be run from inside a Foundation project")
+			log.Fatal("This command must be run from inside a Foundation service")
 		}
 
 		// Read all subdirectories under the cmd directory
-		files, err := os.ReadDir(h.AtProjectRoot("cmd"))
+		files, err := os.ReadDir(h.AtServiceRoot("cmd"))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -45,7 +45,7 @@ var Start = &cobra.Command{
 		}
 
 		// Run the service
-		svc := exec.Command("go", "run", h.AtProjectRoot("cmd", binaryName))
+		svc := exec.Command("go", "run", h.AtServiceRoot("cmd", binaryName))
 		svc.Stdout = os.Stdout
 		svc.Stderr = os.Stderr
 		if err = svc.Run(); err != nil {
