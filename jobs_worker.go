@@ -31,9 +31,9 @@ func InitJobsWorker(name string) *JobsWorker {
 }
 
 type JobOptions struct {
-	handler  func(job *work.Job) error
-	schedule string
-	options  *work.JobOptions
+	Handler  func(job *work.Job) error
+	Schedule string
+	Options  *work.JobOptions
 }
 
 // JobsWorkerOptions represents the options for starting a jobs worker
@@ -89,16 +89,16 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 	}
 
 	for jobName, jobOptions := range w.Options.Jobs {
-		if jobOptions.handler == nil {
+		if jobOptions.Handler == nil {
 			return fmt.Errorf("job %s has no handler", jobName)
 		}
 
-		if jobOptions.options != nil {
-			workerPool.JobWithOptions(jobName, *jobOptions.options, jobOptions.handler)
+		if jobOptions.Options != nil {
+			workerPool.JobWithOptions(jobName, *jobOptions.Options, jobOptions.Handler)
 		}
 
-		if jobOptions.schedule != "" {
-			workerPool.PeriodicallyEnqueue(jobOptions.schedule, jobName)
+		if jobOptions.Schedule != "" {
+			workerPool.PeriodicallyEnqueue(jobOptions.Schedule, jobName)
 		}
 	}
 
