@@ -20,7 +20,7 @@ const (
 type Component struct {
 	Enqueuer *work.Enqueuer
 
-	url       string
+	address   string
 	namespace string
 	poolSize  int
 	logger    *logrus.Entry
@@ -36,10 +36,10 @@ func WithLogger(logger *logrus.Entry) ComponentOption {
 	}
 }
 
-// WithURL sets the database URL for the JobsEnqueuer component.
-func WithURL(url string) ComponentOption {
+// WithAddress sets the redis address for the JobsEnqueuer component.
+func WithAddress(address string) ComponentOption {
 	return func(c *Component) {
-		c.url = url
+		c.address = address
 	}
 }
 
@@ -82,7 +82,7 @@ func (c *Component) Start() error {
 		MaxIdle:   c.poolSize,
 		Wait:      true,
 		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", c.url)
+			return redis.Dial("tcp", c.address)
 		},
 	})
 

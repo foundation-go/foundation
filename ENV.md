@@ -36,7 +36,8 @@ The following environment variables are only applicable when running in `events_
 
 The following environment variables are only applicable when running in `jobs_worker` mode.
 
-- `REDIS_URL`: The URL of the Redis instance to use for jobs. Must be set when using the `jobs_worker` mode.
+- `REDIS_URL`: The Redis URL to use for the `gocraft_work` backend, e.g. `redis://localhost:6379`. Required.
+- `REDIS_POOL`: The maximum number of active connections to the Redis instance. Default: `5`.
 
 ## gRPC
 
