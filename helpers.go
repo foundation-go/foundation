@@ -2,6 +2,7 @@ package foundation
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 )
@@ -22,4 +23,16 @@ func AddSuffix(s string, suffix string) string {
 // Clone clones an object.
 func Clone(obj interface{}) interface{} {
 	return reflect.New(reflect.TypeOf(obj)).Interface()
+}
+
+func ExtractHostAndPort(URL string) (string, error) {
+	parsedURL, err := url.Parse(URL)
+	if err != nil {
+		return "", err
+	}
+
+	host := parsedURL.Hostname()
+	port := parsedURL.Port()
+
+	return fmt.Sprintf("%s:%s", host, port), nil
 }

@@ -69,12 +69,17 @@ func (w *JobsWorker) Start(opts *JobsWorkerOptions) {
 }
 
 func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
+	redisAddress, err := ExtractHostAndPort(w.Config.JobsEnqueuer.URL)
+	if err != nil {
+		return fmt.Errorf("failed to extract host and port from redis URL: %w", err)
+	}
+
 	var redisPool = &redis.Pool{
 		MaxActive: w.Options.Concurrency,
 		MaxIdle:   w.Options.Concurrency,
 		Wait:      true,
 		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", w.Config.Redis.URL)
+			return redis.Dial("tcp", redisAddress)
 		},
 	}
 
