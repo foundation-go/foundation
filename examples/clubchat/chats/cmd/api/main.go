@@ -40,6 +40,7 @@ func main() {
 		},
 		StartComponentsOptions: []f.StartComponentsOption{
 			f.WithKafkaProducer(),
+			f.WithOutbox(),
 		},
 	}
 

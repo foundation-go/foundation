@@ -98,10 +98,12 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 
 	queries := outboxrepo.New(tx)
 	params := outboxrepo.CreateOutboxEventParams{
-		Topic:   event.Topic,
-		Key:     event.Key,
-		Payload: event.Payload,
-		Headers: headers,
+		Topic:         event.Topic,
+		Key:           event.Key,
+		Payload:       event.Payload,
+		Headers:       headers,
+		ProtoName:     event.ProtoName,
+		CorrelationID: fctx.GetCorrelationID(ctx),
 	}
 	// Publish event
 	if err = queries.CreateOutboxEvent(ctx, params); err != nil {
@@ -190,8 +192,8 @@ func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) ([]*Ev
 }
 
 // ListOutboxEvents returns a list of outbox events in the order they were created.
-func (s *Service) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
-	queries := outboxrepo.New(s.GetPostgreSQL())
+func (s *Service) ListOutboxEvents(ctx context.Context, tx *sql.Tx, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
+	queries := outboxrepo.New(tx)
 
 	events, err := queries.ListOutboxEvents(ctx, limit)
 	if err != nil {
@@ -202,8 +204,8 @@ func (s *Service) ListOutboxEvents(ctx context.Context, limit int32) ([]outboxre
 }
 
 // DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
-func (s *Service) DeleteOutboxEvents(ctx context.Context, maxID int64) ferr.FoundationError {
-	queries := outboxrepo.New(s.GetPostgreSQL())
+func (s *Service) DeleteOutboxEvents(ctx context.Context, tx *sql.Tx, maxID int64) ferr.FoundationError {
+	queries := outboxrepo.New(tx)
 
 	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {
 		return ferr.NewInternalError(err, "failed to `DeleteOutboxEvents`")
