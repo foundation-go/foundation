@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -73,11 +74,15 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 
 // publishEventToOutbox publishes an event to the outbox.
 func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) ferr.FoundationError {
-	commitNeeded := false
+	var (
+		err error
+
+		commitNeeded = false
+	)
 
 	if tx == nil {
 		// Start transaction
-		tx, err := s.GetPostgreSQL().Begin()
+		tx, err = s.GetPostgreSQL().Begin()
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
@@ -99,7 +104,7 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 		Headers: headers,
 	}
 	// Publish event
-	if err := queries.CreateOutboxEvent(ctx, params); err != nil {
+	if err = queries.CreateOutboxEvent(ctx, params); err != nil {
 		return ferr.NewInternalError(err, "failed to insert event into outbox")
 	}
 
@@ -150,7 +155,7 @@ func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key
 
 // WithTransaction executes the given function in a transaction. If the function
 // returns an event, it will be published.
-func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Event, ferr.FoundationError)) ferr.FoundationError {
+func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) ([]*Event, ferr.FoundationError)) ferr.FoundationError {
 	// Start transaction
 	tx, err := s.GetPostgreSQL().Begin()
 	if err != nil {
@@ -159,15 +164,20 @@ func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) (*Even
 	defer tx.Rollback() // nolint: errcheck
 
 	// Execute function
-	event, fErr := f(tx)
+	events, fErr := f(tx)
 	if fErr != nil {
 		return fErr
 	}
 
-	// Publish event (if any)
-	if event != nil {
-		if err = s.PublishEvent(ctx, event, tx); err != nil {
-			return ferr.NewInternalError(err, "failed to publish event")
+	// Publish events (if any)
+	if len(events) > 0 {
+		for i, event := range events {
+			if err = s.PublishEvent(ctx, event, tx); err != nil {
+				return ferr.NewInternalError(
+					err,
+					fmt.Sprintf("failed to publish event %s: %d out of %d", event.ProtoName, i+1, len(events)),
+				)
+			}
 		}
 	}
 
