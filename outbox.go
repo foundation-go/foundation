@@ -98,12 +98,10 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 
 	queries := outboxrepo.New(tx)
 	params := outboxrepo.CreateOutboxEventParams{
-		Topic:         event.Topic,
-		Key:           event.Key,
-		Payload:       event.Payload,
-		Headers:       headers,
-		ProtoName:     event.ProtoName,
-		CorrelationID: fctx.GetCorrelationID(ctx),
+		Topic:   event.Topic,
+		Key:     event.Key,
+		Payload: event.Payload,
+		Headers: headers,
 	}
 	// Publish event
 	if err = queries.CreateOutboxEvent(ctx, params); err != nil {

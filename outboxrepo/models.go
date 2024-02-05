@@ -10,12 +10,10 @@ import (
 )
 
 type FoundationOutboxEvent struct {
-	ID            int64
-	Topic         string
-	Key           string
-	ProtoName     string
-	Payload       []byte
-	Headers       json.RawMessage
-	CorrelationID string
-	CreatedAt     time.Time
+	ID        int64
+	Topic     string
+	Key       string
+	Payload   []byte
+	Headers   json.RawMessage
+	CreatedAt time.Time
 }

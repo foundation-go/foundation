@@ -11,27 +11,23 @@ import (
 )
 
 const createOutboxEvent = `-- name: CreateOutboxEvent :exec
-INSERT INTO foundation_outbox_events (topic, key, proto_name, payload, headers, correlation_id, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, NOW())
+INSERT INTO foundation_outbox_events (topic, key, payload, headers, created_at)
+VALUES ($1, $2, $3, $4, NOW())
 `
 
 type CreateOutboxEventParams struct {
-	Topic         string
-	Key           string
-	ProtoName     string
-	Payload       []byte
-	Headers       json.RawMessage
-	CorrelationID string
+	Topic   string
+	Key     string
+	Payload []byte
+	Headers json.RawMessage
 }
 
 func (q *Queries) CreateOutboxEvent(ctx context.Context, arg CreateOutboxEventParams) error {
 	_, err := q.db.ExecContext(ctx, createOutboxEvent,
 		arg.Topic,
 		arg.Key,
-		arg.ProtoName,
 		arg.Payload,
 		arg.Headers,
-		arg.CorrelationID,
 	)
 	return err
 }
@@ -46,7 +42,7 @@ func (q *Queries) DeleteOutboxEvents(ctx context.Context, id int64) error {
 }
 
 const listOutboxEvents = `-- name: ListOutboxEvents :many
-SELECT id, topic, key, proto_name, payload, headers, correlation_id, created_at FROM foundation_outbox_events ORDER BY id ASC LIMIT $1
+SELECT id, topic, key, payload, headers, created_at FROM foundation_outbox_events ORDER BY id ASC LIMIT $1
 `
 
 func (q *Queries) ListOutboxEvents(ctx context.Context, limit int32) ([]FoundationOutboxEvent, error) {
@@ -62,10 +58,8 @@ func (q *Queries) ListOutboxEvents(ctx context.Context, limit int32) ([]Foundati
 			&i.ID,
 			&i.Topic,
 			&i.Key,
-			&i.ProtoName,
 			&i.Payload,
 			&i.Headers,
-			&i.CorrelationID,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

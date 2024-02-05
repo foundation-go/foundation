@@ -5,11 +5,11 @@ import (
 )
 
 var (
-	svc = f.InitOutboxProducer("chats-outbox")
+	svc = f.InitOutboxCourier("chats-outbox")
 )
 
 func main() {
-	svc.Start(&f.OutboxProducerOptions{
+	svc.Start(&f.OutboxCourierOptions{
 		BatchSize: 100,
 	})
 }
