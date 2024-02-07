@@ -32,6 +32,7 @@ Foundation is built upon several proven technologies including:
   - **Job Mode**: Best suited for one-off operations. Think of tasks like initializing your database, running migrations, or seeding initial data.
   - **Cable gRPC Mode**: Function as an AnyCable-compatible gRPC server, ideal for real-time WebSocket functionalities without sacrificing scalability.
   - **Cable Courier Mode**: This mode specializes in reading events from Kafka and then broadcasting them to Redis, readying the events for AnyCable processing. _Yeah, it would be much better if we could just use Kafka directly, but AnyCable doesn't support it._
+  - **Outbox Courier Mode**: A mode to run a Kafka producer that reads messages from the database and publishes them to Kafka. _This is useful for implementing the transactional outbox pattern._
 - 📬 **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
 - ✏️ **Unified Logging**: Conveniently log with colors during development and structured logging in production using `logrus`.
 - 🔍 **Tracing**: Trace and log your requests in a structured format with OpenTracing.
