@@ -22,9 +22,9 @@ func IntrospectedOAuth2Token(ctx context.Context, token string) (*hydra.Introspe
 	client := hydra.NewAPIClient(config)
 
 	// Authenticate the token using ORY Hydra
-	req := client.OAuth2Api.IntrospectOAuth2Token(ctx)
+	req := client.OAuth2API.IntrospectOAuth2Token(ctx)
 	req = req.Token(token)
-	resp, _, err := client.OAuth2Api.IntrospectOAuth2TokenExecute(req)
+	resp, _, err := client.OAuth2API.IntrospectOAuth2TokenExecute(req)
 
 	if err != nil {
 		return nil, err
