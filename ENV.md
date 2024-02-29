@@ -38,6 +38,7 @@ The following environment variables are only applicable when running in `jobs_wo
 
 - `REDIS_URL`: The Redis URL to use for the `gocraft_work` backend, e.g. `redis://localhost:6379`. Required.
 - `REDIS_POOL`: The maximum number of active connections to the Redis instance. Default: `5`.
+- `REDIS_NAMESPACE`: The namespace to use for the Redis keys. Default: `__foundation_jobs__`.
 
 ## gRPC
 

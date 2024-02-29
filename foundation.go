@@ -111,9 +111,10 @@ type RedisConfig struct {
 
 // JobsEnqueuerConfig represents the configuration of a jobs enqueuer.
 type JobsEnqueuerConfig struct {
-	Enabled bool
-	URL     string
-	Pool    int
+	Enabled   bool
+	URL       string
+	Pool      int
+	Namespace string
 }
 
 // NewConfig returns a new Config with values populated from environment variables.
@@ -158,9 +159,10 @@ func NewConfig() *Config {
 			Enabled: len(GetEnvOrString("SENTRY_DSN", "")) > 0,
 		},
 		JobsEnqueuer: &JobsEnqueuerConfig{
-			Enabled: false,
-			URL:     GetEnvOrString("REDIS_URL", ""),
-			Pool:    GetEnvOrInt("REDIS_POOL", 5),
+			Enabled:   false,
+			URL:       GetEnvOrString("REDIS_URL", ""),
+			Pool:      GetEnvOrInt("REDIS_POOL", 5),
+			Namespace: GetEnvOrString("REDIS_NAMESPACE", ""),
 		},
 	}
 }
@@ -285,6 +287,7 @@ func (s *Service) addSystemComponents() error {
 			fjobs.WithLogger(s.Logger),
 			fjobs.WithAddress(redisAddress),
 			fjobs.WithPoolSize(s.Config.JobsEnqueuer.Pool),
+			fjobs.WithNamespace(s.Config.JobsEnqueuer.Namespace),
 		))
 	}
 
