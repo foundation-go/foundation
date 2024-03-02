@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/getsentry/sentry-go"
-	grpcm "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 
 	fg "github.com/foundation-go/foundation/grpc"
@@ -57,14 +56,16 @@ func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	// Default interceptors
 	//
 	// N.B.: Interceptors are executed in the order they are defined.
-	defaultInterceptors := grpc.UnaryInterceptor(grpcm.ChainUnaryServer(
+	defaultInterceptors := []grpc.UnaryServerInterceptor{
 		fg.MetadataUnaryInterceptor,
 		fg.LoggingUnaryInterceptor(s.Logger),
 		fg.FoundationErrorToStatusUnaryInterceptor,
-	))
+	}
 
 	// Construct the default server options
-	defaultOptions := []grpc.ServerOption{defaultInterceptors}
+	defaultOptions := []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(defaultInterceptors...),
+	}
 
 	// Prepend the default server options in front of the application-defined ones
 	serverOptions := append(defaultOptions, s.Options.GRPCServerOptions...)
