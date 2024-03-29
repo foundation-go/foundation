@@ -26,13 +26,13 @@ type EventHandler interface {
 	Handle(context.Context, *Event, proto.Message) ([]*Event, ferr.FoundationError)
 }
 
-// ErrorModeEnum defines the EventsWorker behavior when errors occur while handle event
-type ErrorModeEnum int
+// ErrorHandlingStrategy defines the EventsWorker behavior when errors occur while handle event
+type ErrorHandlingStrategy int
 
 const (
-	ErrorModeEnumSkip ErrorModeEnum = iota // Default: commit message and skip the event
-	ErrorModeEnumStop                      // Stop the worker
-	// ErrorModeEnumRetry                  // Retry the event // TODO: implement retry mode
+	IgnoreError     ErrorHandlingStrategy = iota // Default: commit message and skip the event
+	ShutdownOnError                              // Stop the worker
+	// RetryOnError                              // Retry the event // TODO: implement retry mode
 )
 
 // EventsWorkerOptions represents the options for starting an events worker
@@ -40,7 +40,7 @@ type EventsWorkerOptions struct {
 	Handlers               map[proto.Message][]EventHandler
 	Topics                 []string
 	ModeName               string
-	ErrorMode              ErrorModeEnum
+	ErrorHandlingStrategy  ErrorHandlingStrategy
 	StartComponentsOptions []StartComponentsOption
 }
 
@@ -134,7 +134,7 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 
 func (w *EventsWorker) newProcessEventFunc(
 	handlers map[proto.Message][]EventHandler,
-	errorMode ErrorModeEnum,
+	errorMode ErrorHandlingStrategy,
 ) func(ctx context.Context) ferr.FoundationError {
 	return func(ctx context.Context) ferr.FoundationError {
 		msg, err := w.GetKafkaConsumer().FetchMessage(ctx)
@@ -193,8 +193,10 @@ func (w *EventsWorker) newProcessEventFunc(
 			log.Info("Event processed successfully")
 		}
 
-		if handleErr != nil && errorMode == ErrorModeEnumStop {
-			w.Logger.WithField("event", event.ProtoName).Fatalf("Cannot process event: %v", handleErr)
+		if handleErr != nil && errorMode == ShutdownOnError {
+			w.Logger.WithField("event", event.ProtoName).Errorf("Cannot process event: %v", handleErr)
+			w.cancelFunc()
+			return handleErr
 		}
 		// Else: errorMode == Skip
 
