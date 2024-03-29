@@ -26,11 +26,21 @@ type EventHandler interface {
 	Handle(context.Context, *Event, proto.Message) ([]*Event, ferr.FoundationError)
 }
 
+// ErrorModeEnum defines the EventsWorker behavior when errors occur while handle event
+type ErrorModeEnum int
+
+const (
+	ErrorModeEnumSkip ErrorModeEnum = iota // Default: commit message and skip the event
+	ErrorModeEnumStop                      // Stop the worker
+	// ErrorModeEnumRetry                  // Retry the event // TODO: implement retry mode
+)
+
 // EventsWorkerOptions represents the options for starting an events worker
 type EventsWorkerOptions struct {
 	Handlers               map[proto.Message][]EventHandler
 	Topics                 []string
 	ModeName               string
+	ErrorMode              ErrorModeEnum
 	StartComponentsOptions []StartComponentsOption
 }
 
@@ -97,7 +107,7 @@ func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 
 	wOpts := NewSpinWorkerOptions()
 	wOpts.ModeName = opts.ModeName
-	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
+	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers, opts.ErrorMode)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
@@ -122,7 +132,10 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHandler) func(ctx context.Context) ferr.FoundationError {
+func (w *EventsWorker) newProcessEventFunc(
+	handlers map[proto.Message][]EventHandler,
+	errorMode ErrorModeEnum,
+) func(ctx context.Context) ferr.FoundationError {
 	return func(ctx context.Context) ferr.FoundationError {
 		msg, err := w.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
@@ -180,10 +193,11 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 			log.Info("Event processed successfully")
 		}
 
-		// For now, we commit the message even if the handler failed to process it.
-		//
-		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
-		// Or maybe even publish the message to a dead-letter topic?
+		if handleErr != nil && errorMode == ErrorModeEnumStop {
+			w.Logger.WithField("event", event.ProtoName).Fatalf("Cannot process event: %v", handleErr)
+		}
+		// Else: errorMode == Skip
+
 		if commitErr := w.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
 		}
