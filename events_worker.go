@@ -30,9 +30,14 @@ type EventHandler interface {
 type ErrorHandlingStrategy int
 
 const (
-	IgnoreError     ErrorHandlingStrategy = iota // Default: commit message and skip the event
-	ShutdownOnError                              // Stop the worker
-	// RetryOnError                              // Retry the event // TODO: implement retry mode
+	// Default strategy: commit the message and skip the event
+	IgnoreError ErrorHandlingStrategy = iota
+
+	// ShutdownOnError stops the worker on error
+	ShutdownOnError
+
+	// RetryOnError retries to handle event on error. TODO: implement RetryOnError.
+	// RetryOnError
 )
 
 // EventsWorkerOptions represents the options for starting an events worker
@@ -107,7 +112,7 @@ func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 
 	wOpts := NewSpinWorkerOptions()
 	wOpts.ModeName = opts.ModeName
-	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers, opts.ErrorMode)
+	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers, opts.ErrorHandlingStrategy)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
@@ -198,7 +203,6 @@ func (w *EventsWorker) newProcessEventFunc(
 			w.cancelFunc()
 			return handleErr
 		}
-		// Else: errorMode == Skip
 
 		if commitErr := w.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
