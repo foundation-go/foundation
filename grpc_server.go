@@ -58,8 +58,8 @@ func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	// N.B.: Interceptors are executed in the order they are defined.
 	defaultInterceptors := []grpc.UnaryServerInterceptor{
 		fg.MetadataUnaryInterceptor,
-		fg.LoggingUnaryInterceptor(s.Logger),
 		fg.FoundationErrorToStatusUnaryInterceptor,
+		fg.LoggingUnaryInterceptor(s.Logger),
 	}
 
 	// Construct the default server options

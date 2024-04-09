@@ -159,6 +159,8 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 
 			handleErr = w.processEvent(ctx, handler, event, protoMsg)
 			if handleErr != nil {
+				log.WithError(handleErr).Errorf("Failed to process event `%s`", event.ProtoName)
+
 				// We publish the error event to the error topic for further delivery to the user via WebSocket.
 				if event.Headers[fkafka.HeaderOriginatorID] != "" {
 					err := w.NewAndPublishEvent(ctx, handleErr.MarshalProto(), event.Headers[fkafka.HeaderOriginatorID], nil, nil)
