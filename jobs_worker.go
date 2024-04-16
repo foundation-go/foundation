@@ -85,7 +85,7 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 
 	workerPool := work.NewWorkerPool(jobsWorkerContext{}, uint(w.Options.Concurrency), w.Options.Namespace, redisPool)
 
-	workerPool.Middleware(w.Logger)
+	workerPool.Middleware(w.LoggingMiddleware)
 
 	if w.Options.Middlewares != nil {
 		for _, middleware := range w.Options.Middlewares {
@@ -100,6 +100,8 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 
 		if jobOptions.Options != nil {
 			workerPool.JobWithOptions(jobName, *jobOptions.Options, jobOptions.Handler)
+		} else {
+			workerPool.Job(jobName, jobOptions.Handler)
 		}
 
 		if jobOptions.Schedule != "" {
@@ -116,14 +118,14 @@ func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
 	return nil
 }
 
-func (w *JobsWorker) Logger(job *work.Job, next work.NextMiddlewareFunc) error {
-	w.Service.Logger.Infof("Starting job %s", job.Name)
+func (w *JobsWorker) LoggingMiddleware(job *work.Job, next work.NextMiddlewareFunc) error {
+	w.Logger.Infof("Starting job %s", job.Name)
 
 	err := next()
 	if err != nil {
-		w.Service.Logger.Errorf("Job %s failed: %v", job.Name, err)
+		w.Logger.Errorf("Job %s failed: %v", job.Name, err)
 	} else {
-		w.Service.Logger.Infof("Job %s completed", job.Name)
+		w.Logger.Infof("Job %s completed", job.Name)
 	}
 
 	return err
