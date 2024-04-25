@@ -26,11 +26,26 @@ type EventHandler interface {
 	Handle(context.Context, *Event, proto.Message) ([]*Event, ferr.FoundationError)
 }
 
+// ErrorHandlingStrategy defines the EventsWorker behavior when errors occur while handle event
+type ErrorHandlingStrategy int
+
+const (
+	// Default strategy: commit the message and skip the event
+	IgnoreError ErrorHandlingStrategy = iota
+
+	// ShutdownOnError stops the worker on error
+	ShutdownOnError
+
+	// RetryOnError retries to handle event on error. TODO: implement RetryOnError.
+	// RetryOnError
+)
+
 // EventsWorkerOptions represents the options for starting an events worker
 type EventsWorkerOptions struct {
 	Handlers               map[proto.Message][]EventHandler
 	Topics                 []string
 	ModeName               string
+	ErrorHandlingStrategy  ErrorHandlingStrategy
 	StartComponentsOptions []StartComponentsOption
 }
 
@@ -97,7 +112,7 @@ func (w *EventsWorker) Start(opts *EventsWorkerOptions) {
 
 	wOpts := NewSpinWorkerOptions()
 	wOpts.ModeName = opts.ModeName
-	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers)
+	wOpts.ProcessFunc = w.newProcessEventFunc(opts.Handlers, opts.ErrorHandlingStrategy)
 	wOpts.StartComponentsOptions = append(opts.StartComponentsOptions,
 		WithKafkaConsumer(),
 		WithKafkaConsumerTopics(opts.GetTopics()...),
@@ -122,7 +137,10 @@ func newEventFromKafkaMessage(msg *kafka.Message) *Event {
 	}
 }
 
-func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHandler) func(ctx context.Context) ferr.FoundationError {
+func (w *EventsWorker) newProcessEventFunc(
+	handlers map[proto.Message][]EventHandler,
+	errorMode ErrorHandlingStrategy,
+) func(ctx context.Context) ferr.FoundationError {
 	return func(ctx context.Context) ferr.FoundationError {
 		msg, err := w.GetKafkaConsumer().FetchMessage(ctx)
 		if err != nil {
@@ -180,10 +198,12 @@ func (w *EventsWorker) newProcessEventFunc(handlers map[proto.Message][]EventHan
 			log.Info("Event processed successfully")
 		}
 
-		// For now, we commit the message even if the handler failed to process it.
-		//
-		// TODO: add a configuration option to allow the user to choose whether to commit the message or not.
-		// Or maybe even publish the message to a dead-letter topic?
+		if handleErr != nil && errorMode == ShutdownOnError {
+			w.Logger.WithField("event", event.ProtoName).Errorf("Cannot process event: %v", handleErr)
+			w.cancelFunc()
+			return handleErr
+		}
+
 		if commitErr := w.CommitMessage(ctx, msg); commitErr != nil {
 			return commitErr
 		}

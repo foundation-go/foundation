@@ -26,6 +26,7 @@ type Service struct {
 	Config     *Config
 	Components []Component
 	ModeName   string
+	cancelFunc context.CancelFunc
 
 	Logger *logrus.Entry
 }
@@ -362,6 +363,8 @@ func (s *Service) Start(opts *StartOptions) {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	s.cancelFunc = stop
 
 	// Run the actual service code
 	if err := opts.ServiceFunc(ctx); err != nil {
