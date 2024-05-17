@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+
+	"github.com/gomodule/redigo/redis"
 )
 
 // AddSuffix adds a suffix to a string, if it doesn't already have it.
@@ -25,14 +27,26 @@ func Clone(obj interface{}) interface{} {
 	return reflect.New(reflect.TypeOf(obj)).Interface()
 }
 
-func ExtractHostAndPort(URL string) (string, error) {
+func BuildRedisPool(URL string, poolSize int) (*redis.Pool, error) {
 	parsedURL, err := url.Parse(URL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	host := parsedURL.Hostname()
-	port := parsedURL.Port()
+	username := parsedURL.User.Username()
+	password, _ := parsedURL.User.Password()
 
-	return fmt.Sprintf("%s:%s", host, port), nil
+	return &redis.Pool{
+		MaxActive: poolSize,
+		MaxIdle:   poolSize,
+		Wait:      true,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial(
+				"tcp",
+				fmt.Sprintf("%s:%s", parsedURL.Hostname(), parsedURL.Port()),
+				redis.DialUsername(username),
+				redis.DialPassword(password),
+			)
+		},
+	}, nil
 }

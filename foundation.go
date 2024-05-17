@@ -279,15 +279,14 @@ func (s *Service) addSystemComponents() error {
 	}
 
 	if s.Config.JobsEnqueuer.Enabled {
-		redisAddress, err := ExtractHostAndPort(s.Config.JobsEnqueuer.URL)
+		redisPool, err := BuildRedisPool(s.Config.JobsEnqueuer.URL, s.Config.JobsEnqueuer.Pool)
 		if err != nil {
-			return fmt.Errorf("failed to extract host and port from redis URL: %w", err)
+			return fmt.Errorf("failed to initialize redis pool: %w", err)
 		}
 
 		s.Components = append(s.Components, fjobs.NewComponent(
 			fjobs.WithLogger(s.Logger),
-			fjobs.WithAddress(redisAddress),
-			fjobs.WithPoolSize(s.Config.JobsEnqueuer.Pool),
+			fjobs.WithRedisPool(redisPool),
 			fjobs.WithNamespace(s.Config.JobsEnqueuer.Namespace),
 		))
 	}

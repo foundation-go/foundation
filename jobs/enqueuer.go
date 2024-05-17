@@ -20,9 +20,8 @@ const (
 type Component struct {
 	Enqueuer *work.Enqueuer
 
-	address   string
+	redisPool *redis.Pool
 	namespace string
-	poolSize  int
 	logger    *logrus.Entry
 }
 
@@ -36,17 +35,10 @@ func WithLogger(logger *logrus.Entry) ComponentOption {
 	}
 }
 
-// WithAddress sets the redis address for the JobsEnqueuer component.
-func WithAddress(address string) ComponentOption {
+// WithRedisPool sets the redis pool for JobsEnqueuer component.
+func WithRedisPool(redisPool *redis.Pool) ComponentOption {
 	return func(c *Component) {
-		c.address = address
-	}
-}
-
-// WithPoolSize sets the pool size for the JobsEnqueuer component.
-func WithPoolSize(poolSize int) ComponentOption {
-	return func(c *Component) {
-		c.poolSize = poolSize
+		c.redisPool = redisPool
 	}
 }
 
@@ -69,23 +61,11 @@ func NewComponent(opts ...ComponentOption) *Component {
 
 // Start implements the Component interface.
 func (c *Component) Start() error {
-	if c.poolSize == 0 {
-		c.poolSize = DefaultPoolSize
-	}
-
 	if c.namespace == "" {
 		c.namespace = DefaultNamespace
 	}
 
-	c.Enqueuer = work.NewEnqueuer(c.namespace, &redis.Pool{
-		MaxActive: c.poolSize,
-		MaxIdle:   c.poolSize,
-		Wait:      true,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", c.address)
-		},
-	})
-
+	c.Enqueuer = work.NewEnqueuer(c.namespace, c.redisPool)
 	return c.Health()
 }
 
