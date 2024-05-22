@@ -61,6 +61,8 @@ The following environment variables are only applicable when running in `jobs_wo
   - `ca.crt`: The CA certificate.
   - `server.crt`: The client certificate.
   - `server.key`: The client key.
+- `KAFKA_PRODUCER_BATCH_SIZE`: The maximum number of messages to batch before sending to Kafka. Default: `1`.
+- `KAFKA_PRODUCER_BATCH_TIMEOUT`: The maximum time to wait before sending a batch of messages to Kafka in seconds. Default: `1`.
 
 ## PostgreSQL
 

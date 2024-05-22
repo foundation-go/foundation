@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sirupsen/logrus"
@@ -84,7 +85,9 @@ type KafkaConsumerConfig struct {
 
 // KafkaProducerConfig represents the configuration of a Kafka producer.
 type KafkaProducerConfig struct {
-	Enabled bool
+	Enabled      bool
+	BatchSize    int
+	BatchTimeout int
 }
 
 // MetricsConfig represents the configuration of a metrics server.
@@ -140,7 +143,9 @@ func NewConfig() *Config {
 				Topics:  nil,
 			},
 			Producer: &KafkaProducerConfig{
-				Enabled: false,
+				Enabled:      false,
+				BatchSize:    GetEnvOrInt("KAFKA_PRODUCER_BATCH_SIZE", 1),
+				BatchTimeout: GetEnvOrInt("KAFKA_PRODUCER_BATCH_TIMEOUT", 1),
 			},
 			TLSDir: GetEnvOrString("KAFKA_TLS_DIR", ""),
 		},
@@ -258,6 +263,8 @@ func (s *Service) addSystemComponents() error {
 			fkafka.WithProducerBrokers(s.Config.Kafka.Brokers),
 			fkafka.WithProducerLogger(s.Logger),
 			fkafka.WithProducerTLSDir(s.Config.Kafka.TLSDir),
+			fkafka.WithProducerBatchSize(s.Config.Kafka.Producer.BatchSize),
+			fkafka.WithProducerBatchTimeout(time.Duration(s.Config.Kafka.Producer.BatchTimeout)*time.Second),
 		))
 	}
 

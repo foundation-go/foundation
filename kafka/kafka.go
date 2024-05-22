@@ -136,9 +136,11 @@ func (c *ConsumerComponent) Name() string {
 type ProducerComponent struct {
 	Producer *kafka.Writer
 
-	brokers []string
-	logger  *logrus.Entry
-	tlsDir  string
+	brokers      []string
+	logger       *logrus.Entry
+	tlsDir       string
+	batchSize    int
+	batchTimeout time.Duration
 }
 
 // ProducerComponentOption represents an option for the ProducerComponent
@@ -165,6 +167,20 @@ func WithProducerTLSDir(tlsDir string) ProducerComponentOption {
 	}
 }
 
+// WithProducerBatchSize sets the batching size for the ProducerComponent
+func WithProducerBatchSize(batchSize int) ProducerComponentOption {
+	return func(c *ProducerComponent) {
+		c.batchSize = batchSize
+	}
+}
+
+// WithProducerBatchTimeout sets the batching timeout for the ProducerComponent
+func WithProducerBatchTimeout(batchTimeout time.Duration) ProducerComponentOption {
+	return func(c *ProducerComponent) {
+		c.batchTimeout = batchTimeout
+	}
+}
+
 // NewProducerComponent returns a new ProducerComponent
 func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 	c := &ProducerComponent{}
@@ -186,10 +202,11 @@ func (c *ProducerComponent) Start() error {
 	producer := &kafka.Writer{
 		Addr:                   kafka.TCP(c.brokers...),
 		AllowAutoTopicCreation: true,
-		BatchSize:              1,               // TODO: make this configurable
-		BatchTimeout:           1 * time.Second, // TODO: make this configurable
+		BatchSize:              c.batchSize,
+		BatchTimeout:           c.batchTimeout,
 		Logger:                 c.logger,
 		Transport:              transport,
+		Balancer:               &kafka.Hash{}, // distribute messages to partitions based on the hash of the key, round-robin if no key
 	}
 
 	c.Producer = producer
