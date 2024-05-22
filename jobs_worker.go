@@ -7,7 +7,6 @@ import (
 	"github.com/foundation-go/foundation/jobs"
 
 	"github.com/gocraft/work"
-	"github.com/gomodule/redigo/redis"
 )
 
 const (
@@ -69,18 +68,9 @@ func (w *JobsWorker) Start(opts *JobsWorkerOptions) {
 }
 
 func (w *JobsWorker) ServiceFunc(ctx context.Context) error {
-	redisAddress, err := ExtractHostAndPort(w.Config.JobsEnqueuer.URL)
+	redisPool, err := BuildRedisPool(w.Config.JobsEnqueuer.URL, w.Options.Concurrency)
 	if err != nil {
-		return fmt.Errorf("failed to extract host and port from redis URL: %w", err)
-	}
-
-	var redisPool = &redis.Pool{
-		MaxActive: w.Options.Concurrency,
-		MaxIdle:   w.Options.Concurrency,
-		Wait:      true,
-		Dial: func() (redis.Conn, error) {
-			return redis.Dial("tcp", redisAddress)
-		},
+		return fmt.Errorf("failed to build redis pool: %w", err)
 	}
 
 	workerPool := work.NewWorkerPool(jobsWorkerContext{}, uint(w.Options.Concurrency), w.Options.Namespace, redisPool)
