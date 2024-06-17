@@ -261,7 +261,7 @@ func (s *Service) addSystemComponents() error {
 
 	// Kafka consumer
 	if s.Config.Kafka.Consumer.Enabled {
-		consumerComponents := make([]fkafka.ConsumerComponentOption, 5)
+		consumerComponents := make([]fkafka.ConsumerComponentOption, 6)
 		consumerComponents[0] = fkafka.WithConsumerAppName(s.Name)
 		consumerComponents[1] = fkafka.WithConsumerBrokers(s.Config.Kafka.Brokers)
 		consumerComponents[2] = fkafka.WithConsumerLogger(s.Logger)
@@ -281,7 +281,7 @@ func (s *Service) addSystemComponents() error {
 
 	// Kafka producer
 	if s.Config.Kafka.Producer.Enabled {
-		producerComponents := make([]fkafka.ProducerComponentOption, 5)
+		producerComponents := make([]fkafka.ProducerComponentOption, 6)
 		producerComponents[0] = fkafka.WithProducerBrokers(s.Config.Kafka.Brokers)
 		producerComponents[1] = fkafka.WithProducerLogger(s.Logger)
 		producerComponents[2] = fkafka.WithProducerTLSDir(s.Config.Kafka.TLSDir)

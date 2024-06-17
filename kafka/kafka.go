@@ -93,8 +93,8 @@ func WithSASLMechanism(protocol, username, password string) (ConsumerComponentOp
 func NewConsumerComponent(opts ...ConsumerComponentOption) *ConsumerComponent {
 	c := &ConsumerComponent{}
 
-	for _, opt := range opts {
-		opt(c)
+	for i := range opts {
+		opts[i](c)
 	}
 
 	return c
@@ -215,8 +215,8 @@ func WithProducerBatchTimeout(batchTimeout time.Duration) ProducerComponentOptio
 func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 	c := &ProducerComponent{}
 
-	for _, opt := range opts {
-		opt(c)
+	for i := range opts {
+		opts[i](c)
 	}
 
 	return c
