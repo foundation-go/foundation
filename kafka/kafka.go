@@ -5,8 +5,12 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/segmentio/kafka-go/sasl"
+	"github.com/segmentio/kafka-go/sasl/plain"
+	"github.com/segmentio/kafka-go/sasl/scram"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -27,11 +31,12 @@ const (
 type ConsumerComponent struct {
 	Consumer *kafka.Reader
 
-	appName string
-	brokers []string
-	logger  *logrus.Entry
-	topics  []string
-	tlsDir  string
+	appName       string
+	brokers       []string
+	logger        *logrus.Entry
+	saslMechanism sasl.Mechanism
+	topics        []string
+	tlsDir        string
 }
 
 // ConsumerComponentOption represents an option for the ConsumerComponent
@@ -72,12 +77,24 @@ func WithConsumerTLSDir(tlsDir string) ConsumerComponentOption {
 	}
 }
 
+// WithSASLMechanism sets the sasl mechanism for the ConsumerComponent
+func WithSASLMechanism(protocol, username, password string) (ConsumerComponentOption, error) {
+	mechanism, err := newSASLMechanism(protocol, username, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(c *ConsumerComponent) {
+		c.saslMechanism = mechanism
+	}, err
+}
+
 // NewConsumerComponent returns a new ConsumerComponent
 func NewConsumerComponent(opts ...ConsumerComponentOption) *ConsumerComponent {
 	c := &ConsumerComponent{}
 
-	for _, opt := range opts {
-		opt(c)
+	for i := range opts {
+		opts[i](c)
 	}
 
 	return c
@@ -97,7 +114,7 @@ func (c *ConsumerComponent) Start() error {
 		ErrorLogger: c.logger,
 	}
 
-	dialer, err := newDialer(c.tlsDir)
+	dialer, err := newDialer(c.tlsDir, c.saslMechanism)
 	if err != nil {
 		return err
 	}
@@ -136,15 +153,28 @@ func (c *ConsumerComponent) Name() string {
 type ProducerComponent struct {
 	Producer *kafka.Writer
 
-	brokers      []string
-	logger       *logrus.Entry
-	tlsDir       string
-	batchSize    int
-	batchTimeout time.Duration
+	brokers       []string
+	logger        *logrus.Entry
+	tlsDir        string
+	batchSize     int
+	batchTimeout  time.Duration
+	saslMechanism sasl.Mechanism
 }
 
 // ProducerComponentOption represents an option for the ProducerComponent
 type ProducerComponentOption func(*ProducerComponent)
+
+// WithProducerSASLMechanism sets the sasl mechanism for the ProducerComponent
+func WithProducerSASLMechanism(protocol, username, password string) (ProducerComponentOption, error) {
+	mechanism, err := newSASLMechanism(protocol, username, password)
+	if err != nil {
+		return nil, err
+	}
+
+	return func(c *ProducerComponent) {
+		c.saslMechanism = mechanism
+	}, err
+}
 
 // WithProducerBrokers sets the brokers for the ProducerComponent
 func WithProducerBrokers(brokers []string) ProducerComponentOption {
@@ -185,8 +215,8 @@ func WithProducerBatchTimeout(batchTimeout time.Duration) ProducerComponentOptio
 func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 	c := &ProducerComponent{}
 
-	for _, opt := range opts {
-		opt(c)
+	for i := range opts {
+		opts[i](c)
 	}
 
 	return c
@@ -194,7 +224,7 @@ func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 
 // Start implements the Component interface.
 func (c *ProducerComponent) Start() error {
-	transport, err := newTransport(c.tlsDir)
+	transport, err := newTransport(c.tlsDir, c.saslMechanism)
 	if err != nil {
 		return err
 	}
@@ -216,9 +246,7 @@ func (c *ProducerComponent) Start() error {
 
 // Stop implements the Component interface.
 func (c *ProducerComponent) Stop() error {
-	c.Producer.Close()
-
-	return nil
+	return c.Producer.Close()
 }
 
 // Health implements the Component interface.
@@ -235,35 +263,55 @@ func (c *ProducerComponent) Name() string {
 	return ProducerComponentName
 }
 
-func newDialer(tlsDir string) (*kafka.Dialer, error) {
-	if tlsDir == "" {
+func newDialer(tlsDir string, saslMechanism sasl.Mechanism) (*kafka.Dialer, error) {
+	if tlsDir == "" && saslMechanism == nil {
 		return nil, nil
 	}
 
-	tlsConfig, err := newTLSConfig(tlsDir)
+	var (
+		tlsConfig *tls.Config
+		err       error
+	)
+
+	if tlsDir != "" {
+		tlsConfig, err = newTLSConfig(tlsDir)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &kafka.Dialer{
-		Timeout:   10 * time.Second,
-		DualStack: true,
-		TLS:       tlsConfig,
-	}, nil
+	dialer := &kafka.Dialer{
+		Timeout:       10 * time.Second,
+		DualStack:     true,
+		TLS:           tlsConfig,
+		SASLMechanism: saslMechanism,
+	}
+
+	return dialer, nil
 }
 
-func newTransport(tlsDir string) (*kafka.Transport, error) {
-	if tlsDir == "" {
+func newTransport(tlsDir string, saslMechanism sasl.Mechanism) (*kafka.Transport, error) {
+	if tlsDir == "" && saslMechanism == nil {
 		return &kafka.Transport{}, nil
 	}
 
-	tlsConfig, err := newTLSConfig(tlsDir)
+	var (
+		tlsConfig *tls.Config
+		err       error
+	)
+
+	if tlsDir != "" {
+		tlsConfig, err = newTLSConfig(tlsDir)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	return &kafka.Transport{
-		TLS: tlsConfig,
+		TLS:  tlsConfig,
+		SASL: saslMechanism,
 	}, nil
 }
 
@@ -291,4 +339,27 @@ func newTLSConfig(dir string) (*tls.Config, error) {
 	tlsConfig.RootCAs = caCertPool
 
 	return tlsConfig, nil
+}
+
+// newSASLMechanism return a SASL mechanism
+// Available values for protocol are "plain" or "scram-sha-512"
+func newSASLMechanism(protocol, username, password string) (sasl.Mechanism, error) {
+	var (
+		mechanism sasl.Mechanism
+		err       error
+	)
+
+	switch strings.ToLower(protocol) {
+	case "scram-sha-512":
+		mechanism, err = scram.Mechanism(scram.SHA512, username, password)
+	case "plain":
+		mechanism = plain.Mechanism{
+			Username: username,
+			Password: password,
+		}
+	default:
+		err = fmt.Errorf("unknown protocol %s. available values for protocol are \"plain\" or \"scram-sha-512\"", protocol)
+	}
+
+	return mechanism, err
 }

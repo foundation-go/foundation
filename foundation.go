@@ -72,9 +72,17 @@ type GRPCConfig struct {
 // KafkaConfig represents the configuration of a Kafka client.
 type KafkaConfig struct {
 	Brokers  []string
+	SASL     *KafkaSASLConfig
 	Consumer *KafkaConsumerConfig
 	Producer *KafkaProducerConfig
 	TLSDir   string
+}
+
+// KafkaSASLConfig represents the configuration of a Kafka consumer.
+type KafkaSASLConfig struct {
+	Username string
+	Password string
+	Protocol string
 }
 
 // KafkaConsumerConfig represents the configuration of a Kafka consumer.
@@ -138,6 +146,11 @@ func NewConfig() *Config {
 		},
 		Kafka: &KafkaConfig{
 			Brokers: strings.Split(GetEnvOrString("KAFKA_BROKERS", ""), ","),
+			SASL: &KafkaSASLConfig{
+				Username: GetEnvOrString("KAFKA_SASL_USERNAME", ""),
+				Password: GetEnvOrString("KAFKA_SASL_PASSWORD", ""),
+				Protocol: GetEnvOrString("KAFKA_SASL_PROTOCOL", ""),
+			},
 			Consumer: &KafkaConsumerConfig{
 				Enabled: false,
 				Topics:  nil,
@@ -248,24 +261,42 @@ func (s *Service) addSystemComponents() error {
 
 	// Kafka consumer
 	if s.Config.Kafka.Consumer.Enabled {
-		s.Components = append(s.Components, fkafka.NewConsumerComponent(
-			fkafka.WithConsumerAppName(s.Name),
-			fkafka.WithConsumerBrokers(s.Config.Kafka.Brokers),
-			fkafka.WithConsumerLogger(s.Logger),
-			fkafka.WithConsumerTLSDir(s.Config.Kafka.TLSDir),
-			fkafka.WithConsumerTopics(s.Config.Kafka.Consumer.Topics),
-		))
+		consumerComponents := make([]fkafka.ConsumerComponentOption, 6)
+		consumerComponents[0] = fkafka.WithConsumerAppName(s.Name)
+		consumerComponents[1] = fkafka.WithConsumerBrokers(s.Config.Kafka.Brokers)
+		consumerComponents[2] = fkafka.WithConsumerLogger(s.Logger)
+		consumerComponents[3] = fkafka.WithConsumerTLSDir(s.Config.Kafka.TLSDir)
+		consumerComponents[4] = fkafka.WithConsumerTopics(s.Config.Kafka.Consumer.Topics)
+
+		if s.Config.Kafka.SASL.Username != "" && s.Config.Kafka.SASL.Password != "" {
+			saslComponent, err := fkafka.WithSASLMechanism(s.Config.Kafka.SASL.Protocol, s.Config.Kafka.SASL.Username, s.Config.Kafka.SASL.Password)
+			if err != nil {
+				return err
+			}
+			consumerComponents = append(consumerComponents, saslComponent)
+		}
+
+		s.Components = append(s.Components, fkafka.NewConsumerComponent(consumerComponents...))
 	}
 
 	// Kafka producer
 	if s.Config.Kafka.Producer.Enabled {
-		s.Components = append(s.Components, fkafka.NewProducerComponent(
-			fkafka.WithProducerBrokers(s.Config.Kafka.Brokers),
-			fkafka.WithProducerLogger(s.Logger),
-			fkafka.WithProducerTLSDir(s.Config.Kafka.TLSDir),
-			fkafka.WithProducerBatchSize(s.Config.Kafka.Producer.BatchSize),
-			fkafka.WithProducerBatchTimeout(time.Duration(s.Config.Kafka.Producer.BatchTimeout)*time.Second),
-		))
+		producerComponents := make([]fkafka.ProducerComponentOption, 6)
+		producerComponents[0] = fkafka.WithProducerBrokers(s.Config.Kafka.Brokers)
+		producerComponents[1] = fkafka.WithProducerLogger(s.Logger)
+		producerComponents[2] = fkafka.WithProducerTLSDir(s.Config.Kafka.TLSDir)
+		producerComponents[3] = fkafka.WithProducerBatchSize(s.Config.Kafka.Producer.BatchSize)
+		producerComponents[4] = fkafka.WithProducerBatchTimeout(time.Duration(s.Config.Kafka.Producer.BatchTimeout) * time.Second)
+
+		if s.Config.Kafka.SASL.Username != "" && s.Config.Kafka.SASL.Password != "" {
+			producerSASLComponent, err := fkafka.WithProducerSASLMechanism(s.Config.Kafka.SASL.Protocol, s.Config.Kafka.SASL.Username, s.Config.Kafka.SASL.Password)
+			if err != nil {
+				return err
+			}
+			producerComponents = append(producerComponents, producerSASLComponent)
+		}
+
+		s.Components = append(s.Components, fkafka.NewProducerComponent(producerComponents...))
 	}
 
 	// Metrics server
