@@ -149,7 +149,7 @@ func NewConfig() *Config {
 			SASL: &KafkaSASLConfig{
 				Username: GetEnvOrString("KAFKA_SASL_USERNAME", ""),
 				Password: GetEnvOrString("KAFKA_SASL_PASSWORD", ""),
-				Protocol: GetEnvOrString("KAFKA_SECURITY_PROTOCOL", ""),
+				Protocol: GetEnvOrString("KAFKA_SASL_PROTOCOL", ""),
 			},
 			Consumer: &KafkaConsumerConfig{
 				Enabled: false,
