@@ -358,7 +358,7 @@ func newSASLMechanism(protocol, username, password string) (sasl.Mechanism, erro
 			Password: password,
 		}
 	default:
-		err = fmt.Errorf("unknown protocol %s. available values for protocol are \"plain\" or \"sha512\"", protocol)
+		err = fmt.Errorf("unknown protocol %s. available values for protocol are \"plain\" or \"scram-sha-512\"", protocol)
 	}
 
 	return mechanism, err
