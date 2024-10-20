@@ -64,31 +64,17 @@ type FoundationError interface {
 // InternalError describes an internal error
 type InternalError struct {
 	*BaseError
-	Code    uint32
-	Message string
+
+	Code uint32
 }
 
 func (e *InternalError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Message,
-	}
-
-	st := status.New(codes.Internal, "internal error")
-	st, err := st.WithDetails(detailErr)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
-
-	return st
+	return status.New(codes.Code(e.Code), "internal error")
 }
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *InternalError) MarshalProto() proto.Message {
-	return &pb.Error{
-		Code:    e.Code,
-		Message: e.Message,
-	}
+	return nil
 }
 
 func (e *InternalError) MarshalJSON() ([]byte, error) {
@@ -101,8 +87,7 @@ func NewInternalError(err error, message string) *InternalError {
 		BaseError: &BaseError{
 			Err: errors.Wrap(err, message),
 		},
-		Code:    uint32(codes.Internal),
-		Message: message,
+		Code: uint32(codes.Internal),
 	}
 }
 
@@ -118,19 +103,19 @@ type InvalidArgumentError struct {
 }
 
 func (e *InvalidArgumentError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-		Details: make(map[string]string, len(e.Violations)),
+	detailErr := &pb.InvalidArgument{
+		Fields: make(map[string]*pb.InvalidArgumentRule, len(e.Violations)),
 	}
 
 	for field, description := range e.Violations {
+		fieldRules := make([]string, 0, len(description))
 		for _, d := range description {
-			detailErr.Details[field] = d.String()
+			fieldRules = append(fieldRules, d.String())
 		}
+		detailErr.Fields[field] = &pb.InvalidArgumentRule{Rules: fieldRules}
 	}
 
-	st := status.New(codes.InvalidArgument, e.Error())
+	st := status.New(codes.Code(e.Code), e.Error())
 	st, err := st.WithDetails(detailErr)
 	if err != nil {
 		sentry.CaptureException(err)
@@ -141,16 +126,16 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *InvalidArgumentError) MarshalProto() proto.Message {
-	err := &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-		Details: make(map[string]string, len(e.Violations)),
+	err := &pb.InvalidArgument{
+		Fields: make(map[string]*pb.InvalidArgumentRule, len(e.Violations)),
 	}
 
 	for field, description := range e.Violations {
+		fieldRules := make([]string, len(description))
 		for _, d := range description {
-			err.Details[field] = d.String()
+			fieldRules = append(fieldRules, d.String())
 		}
+		err.Fields[field] = &pb.InvalidArgumentRule{Rules: fieldRules}
 	}
 
 	return err
@@ -162,13 +147,13 @@ func (e *InvalidArgumentError) MarshalJSON() ([]byte, error) {
 }
 
 // NewInvalidArgumentError creates an invalid argument error with error details.
-func NewInvalidArgumentError(kind string, id string, violations map[string][]fmt.Stringer, code uint32) *InvalidArgumentError {
+func NewInvalidArgumentError(kind string, id string, violations map[string][]fmt.Stringer) *InvalidArgumentError {
 	return &InvalidArgumentError{
 		BaseError: &BaseError{
 			Err: fmt.Errorf("invalid argument: %s/%s", kind, id),
 		},
 		Violations: violations,
-		Code:       code,
+		Code:       uint32(codes.InvalidArgument),
 	}
 }
 
@@ -176,33 +161,16 @@ func NewInvalidArgumentError(kind string, id string, violations map[string][]fmt
 type NotFoundError struct {
 	*BaseError
 
-	Kind    string
-	ID      string
-	Code    uint32
-	Message string
+	Code uint32
 }
 
 func (e *NotFoundError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Message,
-	}
-
-	st := status.New(codes.NotFound, e.Message)
-	st, err := st.WithDetails(detailErr)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
-
-	return st
+	return status.New(codes.Code(e.Code), e.Error())
 }
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *NotFoundError) MarshalProto() proto.Message {
-	return &pb.Error{
-		Message: e.Message,
-		Code:    e.Code,
-	}
+	return nil
 }
 
 // MarshalJSON marshals the error to JSON.
@@ -211,15 +179,12 @@ func (e *NotFoundError) MarshalJSON() ([]byte, error) {
 }
 
 // NewNotFoundError creates a not found error.
-func NewNotFoundError(err error, kind string, id string, code uint32) *NotFoundError {
+func NewNotFoundError(err error, kind string, id string) *NotFoundError {
 	return &NotFoundError{
 		BaseError: &BaseError{
-			Err: err,
+			Err: errors.New(fmt.Sprintf(`not found: %s/%s`, kind, id)),
 		},
-		Kind:    kind,
-		ID:      id,
-		Code:    code,
-		Message: fmt.Sprintf(`not found: %s/%s`, kind, id),
+		Code: uint32(codes.NotFound),
 	}
 }
 
@@ -232,26 +197,12 @@ type PermissionDeniedError struct {
 }
 
 func (e *PermissionDeniedError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-	}
-
-	st := status.New(codes.PermissionDenied, e.Error())
-	st, err := st.WithDetails(detailErr)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
-
-	return st
+	return status.New(codes.PermissionDenied, e.Error())
 }
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *PermissionDeniedError) MarshalProto() proto.Message {
-	return &pb.Error{
-		Message: e.Error(),
-		Code:    e.Code,
-	}
+	return nil
 }
 
 // MarshalJSON marshals the error to JSON.
@@ -260,12 +211,12 @@ func (e *PermissionDeniedError) MarshalJSON() ([]byte, error) {
 }
 
 // NewPermissionDeniedError creates a permission denied error.
-func NewPermissionDeniedError(action string, kind string, id string, code uint32) *PermissionDeniedError {
+func NewPermissionDeniedError(action string, kind string, id string) *PermissionDeniedError {
 	return &PermissionDeniedError{
 		BaseError: &BaseError{
 			Err: fmt.Errorf("permission denied: `%s` on %s/%s", action, kind, id),
 		},
-		Code: code,
+		Code: uint32(codes.PermissionDenied),
 	}
 }
 
@@ -297,26 +248,12 @@ type UnauthenticatedError struct {
 }
 
 func (e *UnauthenticatedError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-	}
-
-	st := status.New(codes.Unauthenticated, e.Error())
-	st, err := st.WithDetails(detailErr)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
-
-	return st
+	return status.New(codes.Code(e.Code), e.Error())
 }
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *UnauthenticatedError) MarshalProto() proto.Message {
-	return &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-	}
+	return nil
 }
 
 // MarshalJSON marshals the error to JSON.
@@ -330,7 +267,7 @@ func NewUnauthenticatedError(msg string, code uint32) *UnauthenticatedError {
 		BaseError: &BaseError{
 			Err: fmt.Errorf("unauthenticated: %s", msg),
 		},
-		Code: code,
+		Code: uint32(codes.Unauthenticated),
 	}
 }
 
@@ -338,46 +275,16 @@ func NewUnauthenticatedError(msg string, code uint32) *UnauthenticatedError {
 type StaleObjectError struct {
 	*BaseError
 
-	Kind            string
-	ID              string
-	ActualVersion   int32
-	ExpectedVersion int32
-	Code            uint32
+	Code uint32
 }
 
 func (e *StaleObjectError) GRPCStatus() *status.Status {
-	detailErr := &pb.Error{
-		Code:    e.Code,
-		Message: e.Error(),
-		Details: map[string]string{
-			`kind`:             e.Kind,
-			`id`:               e.ID,
-			`actual_version`:   string(e.ActualVersion),
-			`expected_version`: string(e.ExpectedVersion),
-		},
-	}
-
-	st := status.New(codes.FailedPrecondition, e.Error())
-	st, err := st.WithDetails(detailErr)
-	if err != nil {
-		sentry.CaptureException(err)
-	}
-
-	return st
+	return status.New(codes.Code(e.Code), e.Error())
 }
 
 // MarshalProto marshals the error to a proto.Message.
 func (e *StaleObjectError) MarshalProto() proto.Message {
-	return &pb.Error{
-		Message: e.Error(),
-		Code:    e.Code,
-		Details: map[string]string{
-			`kind`:             e.Kind,
-			`id`:               e.ID,
-			`actual_version`:   string(e.ActualVersion),
-			`expected_version`: string(e.ExpectedVersion),
-		},
-	}
+	return nil
 }
 
 // MarshalJSON marshals the error to JSON.
@@ -386,15 +293,11 @@ func (e *StaleObjectError) MarshalJSON() ([]byte, error) {
 }
 
 // NewStaleObjectError creates a stale object error.
-func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion int32, code uint32) *StaleObjectError {
+func NewStaleObjectError(kind string, id string, actualVersion, expectedVersion int32) *StaleObjectError {
 	return &StaleObjectError{
 		BaseError: &BaseError{
-			Err: fmt.Errorf("stale object: %s/%s", kind, id),
+			Err: fmt.Errorf("stale object: %s/%s actual version: %d, expected version: %d", kind, id, actualVersion, expectedVersion),
 		},
-		Kind:            kind,
-		ID:              id,
-		ActualVersion:   actualVersion,
-		ExpectedVersion: expectedVersion,
-		Code:            code,
+		Code: uint32(codes.FailedPrecondition),
 	}
 }

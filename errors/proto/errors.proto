@@ -4,8 +4,10 @@ package foundation.errors;
 
 option go_package = "github.com/foundation-go/foundation/errors/proto";
 
-message Error {
-  uint32 code = 1;
-  string message = 2;
-  map<string, string> details = 3;
+message InvalidArgumentRule {
+  repeated string rules = 1;
+}
+
+message InvalidArgument {
+  map<string, InvalidArgumentRule> fields = 3;
 }
