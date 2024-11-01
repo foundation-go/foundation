@@ -13,7 +13,7 @@ func (s *chatsServer) ListChats(ctx context.Context, req *pb.ListChatsRequest) (
 	if false {
 		return nil, ferr.NewInvalidArgumentError("Chat", "", ferr.ErrorViolations{
 			"base": {ErrorCodeCustom},
-		})
+		}, 0)
 	}
 
 	// Check required scopes
