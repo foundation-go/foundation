@@ -4,10 +4,38 @@ package foundation.errors;
 
 option go_package = "github.com/foundation-go/foundation/errors/proto";
 
-message InvalidArgumentRule {
-  repeated string rules = 1;
+message InternalError {
 }
 
-message InvalidArgument {
-  map<string, InvalidArgumentRule> fields = 3;
+message UnauthenticatedError {
+}
+
+message StaleObjectError {
+  string kind = 1;
+  string id = 2;
+  int32 actual_version = 3;
+  int32 expected_version = 4;
+}
+
+message NotFoundError {
+  string kind = 1;
+  string id = 2;
+}
+
+message PermissionDeniedError {
+  string kind = 1;
+  string id = 2;
+  string action = 3;
+}
+
+message InvalidArgumentError {
+  message Violation {
+    string field = 1;
+    string description = 2;
+  }
+
+  string kind = 1;
+  string id = 2;
+
+  repeated Violation violations = 3;
 }

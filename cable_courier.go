@@ -59,7 +59,12 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 	handlers := make(map[proto.Message][]EventHandler)
 
 	errors := []proto.Message{
-		&ferrpb.InvalidArgument{},
+		&ferrpb.InternalError{},
+		&ferrpb.UnauthenticatedError{},
+		&ferrpb.StaleObjectError{},
+		&ferrpb.NotFoundError{},
+		&ferrpb.PermissionDeniedError{},
+		&ferrpb.InvalidArgumentError{},
 	}
 
 	// Add default resolvers for errors, if not already defined

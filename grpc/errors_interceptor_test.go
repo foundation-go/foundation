@@ -14,7 +14,7 @@ import (
 func TestFoundationErrorToStatusInterceptor(t *testing.T) {
 	// Define a mock handler that returns an error
 	mockHandler := func(context.Context, interface{}) (interface{}, error) {
-		return nil, ferr.NewNotFoundError(nil, "test", "123", 0)
+		return nil, ferr.NewNotFoundError(nil, "test", "123")
 	}
 
 	ctx := context.Background()
