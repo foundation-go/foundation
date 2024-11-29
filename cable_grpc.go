@@ -7,7 +7,6 @@ import (
 	cablegrpc "github.com/foundation-go/foundation/cable/grpc"
 	pb "github.com/foundation-go/foundation/cable/grpc/proto"
 	"github.com/getsentry/sentry-go"
-	grpcm "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 )
 
@@ -64,9 +63,9 @@ func (s *CableGRPC) ServiceFunc(ctx context.Context) error {
 	//
 	// TODO: Work correctly with interceptors from s.Options
 	// N.B.: Interceptors are executed in the order they are defined.
-	defaultInterceptors := grpc.UnaryInterceptor(grpcm.ChainUnaryServer(
+	defaultInterceptors := grpc.ChainUnaryInterceptor(
 		cablegrpc.LoggingUnaryInterceptor(s.Logger),
-	))
+	)
 
 	// Construct the default server options
 	defaultOptions := []grpc.ServerOption{defaultInterceptors}

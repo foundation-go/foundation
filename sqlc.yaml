@@ -7,3 +7,4 @@ sql:
       go:
         package: "outboxrepo"
         out: "outboxrepo"
+        sql_package: "pgx/v5"

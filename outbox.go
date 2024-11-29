@@ -2,13 +2,13 @@ package foundation
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/foundation-go/foundation/outboxrepo"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
 
 	fctx "github.com/foundation-go/foundation/context"
@@ -73,7 +73,7 @@ func addDefaultHeaders(ctx context.Context, event *Event) *Event {
 }
 
 // publishEventToOutbox publishes an event to the outbox.
-func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sql.Tx) ferr.FoundationError {
+func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx pgx.Tx) ferr.FoundationError {
 	var (
 		err error
 
@@ -82,11 +82,11 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 
 	if tx == nil {
 		// Start transaction
-		tx, err = s.GetPostgreSQL().Begin()
+		tx, err = s.GetPostgreSQL().Begin(ctx)
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
-		defer tx.Rollback() // nolint:errcheck
+		defer tx.Rollback(ctx) // nolint:errcheck
 		commitNeeded = true
 	}
 
@@ -109,7 +109,7 @@ func (s *Service) publishEventToOutbox(ctx context.Context, event *Event, tx *sq
 	}
 
 	if commitNeeded {
-		if err = tx.Commit(); err != nil {
+		if err = tx.Commit(ctx); err != nil {
 			return ferr.NewInternalError(err, "failed to commit transaction")
 		}
 	}
@@ -133,7 +133,7 @@ func (s *Service) publishEventToKafka(ctx context.Context, event *Event) ferr.Fo
 
 // PublishEvent publishes an event to the outbox, starting a new transaction,
 // or straight to the Kafka topic if `OUTBOX_ENABLED` is not set.
-func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) ferr.FoundationError {
+func (s *Service) PublishEvent(ctx context.Context, event *Event, tx pgx.Tx) ferr.FoundationError {
 	event = addDefaultHeaders(ctx, event)
 
 	if s.Config.Outbox.Enabled {
@@ -144,7 +144,7 @@ func (s *Service) PublishEvent(ctx context.Context, event *Event, tx *sql.Tx) fe
 }
 
 // NewAndPublishEvent creates a new event and publishes it to the outbox within a transaction
-func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx *sql.Tx) ferr.FoundationError {
+func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key string, headers map[string]string, tx pgx.Tx) ferr.FoundationError {
 	event, err := NewEventFromProto(msg, key, headers)
 	if err != nil {
 		return err
@@ -155,13 +155,13 @@ func (s *Service) NewAndPublishEvent(ctx context.Context, msg proto.Message, key
 
 // WithTransaction executes the given function in a transaction. If the function
 // returns an event, it will be published.
-func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) ([]*Event, ferr.FoundationError)) ferr.FoundationError {
+func (s *Service) WithTransaction(ctx context.Context, f func(tx pgx.Tx) ([]*Event, ferr.FoundationError)) ferr.FoundationError {
 	// Start transaction
-	tx, err := s.GetPostgreSQL().Begin()
+	tx, err := s.GetPostgreSQL().Begin(ctx)
 	if err != nil {
 		return ferr.NewInternalError(err, "failed to begin transaction")
 	}
-	defer tx.Rollback() // nolint: errcheck
+	defer tx.Rollback(ctx) // nolint: errcheck
 
 	// Execute function
 	events, fErr := f(tx)
@@ -182,7 +182,7 @@ func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) ([]*Ev
 	}
 
 	// Commit transaction
-	if err = tx.Commit(); err != nil {
+	if err = tx.Commit(ctx); err != nil {
 		return ferr.NewInternalError(err, "failed to commit transaction")
 	}
 
@@ -190,7 +190,7 @@ func (s *Service) WithTransaction(ctx context.Context, f func(tx *sql.Tx) ([]*Ev
 }
 
 // ListOutboxEvents returns a list of outbox events in the order they were created.
-func (s *Service) ListOutboxEvents(ctx context.Context, tx *sql.Tx, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
+func (s *Service) ListOutboxEvents(ctx context.Context, tx pgx.Tx, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
 	queries := outboxrepo.New(tx)
 
 	events, err := queries.ListOutboxEvents(ctx, limit)
@@ -202,7 +202,7 @@ func (s *Service) ListOutboxEvents(ctx context.Context, tx *sql.Tx, limit int32)
 }
 
 // DeleteOutboxEvents deletes outbox events up to (and including) the given ID.
-func (s *Service) DeleteOutboxEvents(ctx context.Context, tx *sql.Tx, maxID int64) ferr.FoundationError {
+func (s *Service) DeleteOutboxEvents(ctx context.Context, tx pgx.Tx, maxID int64) ferr.FoundationError {
 	queries := outboxrepo.New(tx)
 
 	if err := queries.DeleteOutboxEvents(ctx, maxID); err != nil {

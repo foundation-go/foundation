@@ -2,7 +2,6 @@ package foundation
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	fctx "github.com/foundation-go/foundation/context"
 	ferr "github.com/foundation-go/foundation/errors"
 	fkafka "github.com/foundation-go/foundation/kafka"
+	"github.com/jackc/pgx/v5"
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/protobuf/proto"
 )
@@ -214,17 +214,17 @@ func (w *EventsWorker) newProcessEventFunc(
 
 func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, event *Event, msg proto.Message) ferr.FoundationError {
 	var (
-		tx         *sql.Tx
+		tx         pgx.Tx
 		needCommit bool
 		err        error
 	)
 
 	if w.Config.Database.Enabled {
-		tx, err = w.GetPostgreSQL().Begin()
+		tx, err = w.GetPostgreSQL().Begin(ctx)
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
-		defer tx.Rollback() // nolint:errcheck
+		defer tx.Rollback(ctx) // nolint:errcheck
 		needCommit = true
 
 		// Add transaction to context
@@ -249,7 +249,7 @@ func (w *EventsWorker) processEvent(ctx context.Context, handler EventHandler, e
 
 	if needCommit {
 		// Commit transaction
-		if err = tx.Commit(); err != nil {
+		if err = tx.Commit(ctx); err != nil {
 			return ferr.NewInternalError(err, "failed to commit transaction")
 		}
 	}

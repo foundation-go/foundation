@@ -1,14 +1,14 @@
 package foundation
 
 import (
-	"database/sql"
 	"errors"
 
 	fpg "github.com/foundation-go/foundation/postgresql"
 	"github.com/getsentry/sentry-go"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func (s *Service) GetPostgreSQL() *sql.DB {
+func (s *Service) GetPostgreSQL() *pgxpool.Pool {
 	component := s.GetComponent(fpg.ComponentName)
 	if component == nil {
 		err := errors.New("PostgreSQL component is not registered")

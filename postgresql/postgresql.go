@@ -1,13 +1,13 @@
 package postgresql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	"github.com/google/uuid"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -17,7 +17,7 @@ const (
 )
 
 type Component struct {
-	Connection *sql.DB
+	Connection *pgxpool.Pool
 
 	databaseURL string
 	poolSize    int
@@ -60,24 +60,23 @@ func NewComponent(opts ...ComponentOption) *Component {
 
 // Start implements the Component interface.
 func (c *Component) Start() error {
-	connConfig, err := pgx.ParseConfig(c.databaseURL)
-	c.logger.Debugf("PostgreSQL connection config: %+v", connConfig)
-	if err != nil {
-		return fmt.Errorf("can't parse DATABASE_URL variable: %w", err)
-	}
-
-	connStr := stdlib.RegisterConnConfig(connConfig)
-	db, err := sql.Open("pgx", connStr)
+	config, err := pgxpool.ParseConfig(c.databaseURL)
 	if err != nil {
 		return err
 	}
 
-	if err = db.Ping(); err != nil {
+	config.MaxConns = int32(c.poolSize)
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
 		return err
 	}
 
-	db.SetMaxOpenConns(c.poolSize)
-	c.Connection = db
+	if err = pool.Ping(context.Background()); err != nil {
+		return err
+	}
+
+	c.Connection = pool
 
 	return nil
 }
@@ -86,7 +85,9 @@ func (c *Component) Start() error {
 func (c *Component) Stop() error {
 	c.logger.Info("Disconnecting from PostgreSQL...")
 
-	return c.Connection.Close()
+	c.Connection.Close()
+
+	return nil
 }
 
 // Health implements the Component interface.
@@ -95,7 +96,7 @@ func (c *Component) Health() error {
 		return fmt.Errorf("connection is not initialized")
 	}
 
-	return c.Connection.Ping()
+	return c.Connection.Ping(context.Background())
 }
 
 // Name implements the Component interface.

@@ -2,9 +2,9 @@ package context
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -128,11 +128,11 @@ func WithScopes(ctx context.Context, scopes Oauth2Scopes) context.Context {
 }
 
 // GetTX returns the transaction from the context.
-func GetTX(ctx context.Context) *sql.Tx {
-	return ctx.Value(CtxKeyTX).(*sql.Tx)
+func GetTX(ctx context.Context) pgx.Tx {
+	return ctx.Value(CtxKeyTX).(pgx.Tx)
 }
 
 // WithTX sets the transaction to the context
-func WithTX(ctx context.Context, tx *sql.Tx) context.Context {
+func WithTX(ctx context.Context, tx pgx.Tx) context.Context {
 	return context.WithValue(ctx, CtxKeyTX, tx)
 }

@@ -68,12 +68,13 @@ func (o *OutboxCourier) Start(outboxOpts *OutboxCourierOptions) {
 
 func (o *OutboxCourier) newProcessFunc(batchSize int32) func(ctx context.Context) ferr.FoundationError {
 	return func(ctx context.Context) ferr.FoundationError {
-		tx, err := o.GetPostgreSQL().Begin()
+		pool := o.GetPostgreSQL()
+		tx, err := pool.Begin(ctx)
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to begin transaction")
 		}
 
-		defer tx.Rollback() // nolint: errcheck
+		defer tx.Rollback(ctx) // nolint: errcheck
 
 		outboxEvents, err := o.ListOutboxEvents(ctx, tx, batchSize)
 		if err != nil {
@@ -97,7 +98,7 @@ func (o *OutboxCourier) newProcessFunc(batchSize int32) func(ctx context.Context
 				Key:       outboxEvent.Key,
 				Payload:   outboxEvent.Payload,
 				ProtoName: headers[fkafka.HeaderProtoName],
-				CreatedAt: outboxEvent.CreatedAt,
+				CreatedAt: outboxEvent.CreatedAt.Time,
 				Headers:   headers,
 			}
 
@@ -110,7 +111,7 @@ func (o *OutboxCourier) newProcessFunc(batchSize int32) func(ctx context.Context
 			return ferr.NewInternalError(err, "failed to delete outbox events")
 		}
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		if err != nil {
 			return ferr.NewInternalError(err, "failed to commit transaction")
 		}
