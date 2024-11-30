@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,10 +15,16 @@ type AuthenticationHandler func(token string) (*AuthenticationResult, error)
 
 // AuthenticationResult is the result of an authentication
 type AuthenticationResult struct {
+	// IsAuthenticated is true if the request is authenticated
 	IsAuthenticated bool
-	ClientID        string
-	UserID          string
-	Scope           string
+	// ClientID is the OAuth2 client ID of the authenticated user (if any)
+	ClientID string
+	// UserID is the user ID of the authenticated user
+	UserID string
+	// Scope is the OAuth2 scope of the authenticated user
+	Scope string
+	// Metadata is the additional metadata for the authenticated user
+	Metadata map[string]string
 }
 
 // WithHydraAuthenticationDetails is a middleware that fetches the authentication details using ORY Hydra
@@ -89,9 +96,15 @@ func WithAuthentication(except []string) func(http.Handler) http.Handler {
 }
 
 func setAuthHeaders(r *http.Request, result *AuthenticationResult) *http.Request {
+	metadata, err := json.Marshal(result.Metadata)
+	if err != nil {
+		metadata = []byte("{}")
+	}
+
 	r.Header.Set(fhttp.HeaderXAuthenticated, strconv.FormatBool(result.IsAuthenticated))
 	r.Header.Set(fhttp.HeaderXClientID, result.ClientID)
 	r.Header.Set(fhttp.HeaderXScope, result.Scope)
+	r.Header.Set(fhttp.HeaderXMetadata, string(metadata))
 	r.Header.Set(fhttp.HeaderXUserID, result.UserID)
 
 	return r

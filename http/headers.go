@@ -35,6 +35,9 @@ const (
 	// HeaderXScope contains the OAuth scope.
 	HeaderXScope = "X-Scope"
 
+	// HeaderXMetadata contains the additional metadata for the authenticated user.
+	HeaderXMetadata = "X-Metadata"
+
 	// HeaderXTotal contains the total number of items.
 	HeaderXTotal = "X-Total"
 
@@ -52,6 +55,7 @@ var FoundationHeaders = []string{
 	HeaderXAuthenticated,
 	HeaderXClientID,
 	HeaderXCorrelationID,
+	HeaderXMetadata,
 	HeaderXPage,
 	HeaderXPerPage,
 	HeaderXScope,
