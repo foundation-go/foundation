@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -49,7 +50,10 @@ func RegisterServices(services []*Service, opts *RegisterServicesOptions) (http.
 		}
 	}
 
-	grpcOpts := []grpc.DialOption{grpc.WithTransportCredentials(connCreds)}
+	grpcOpts := []grpc.DialOption{
+		grpc.WithTransportCredentials(connCreds),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	}
 
 	// Register gRPC server endpoints
 	for _, service := range services {

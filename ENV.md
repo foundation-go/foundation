@@ -21,6 +21,8 @@ The following environment variables are only applicable when using authenticatio
 The following environment variables are only applicable when running in `gateway` mode.
 
 - `GRPC_*_ENDPOINT`: The endpoint of the gRPC service. E.g. `GRPC_USERS_ENDPOINT` for the `users` service.
+- `OTEL_EXPORTER_OTLP_ENDPOINT`: The gRPC endpoint where OpenTelemetry traces will be exported to (`localhost:4317`). Leave empty to disable tracing.
+- `OTEL_TRACES_SAMPLER_RATIO`: The sampling ratio for traces (between 0.0 and 1.0). Default: `1.0`. For example, `0.1` means 10% of traces will be sampled.
 
 ## Events Worker
 

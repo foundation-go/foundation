@@ -77,6 +77,9 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 	gwruntime.DefaultContextTimeout = s.Options.Timeout
 	s.Logger.Debugf("Downstream requests timeout: %s", s.Options.Timeout)
 
+	tracingShutdown := s.initTracing()
+	defer tracingShutdown()
+
 	mux, err := gateway.RegisterServices(
 		s.Options.Services,
 		&gateway.RegisterServicesOptions{
