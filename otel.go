@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -20,6 +21,10 @@ func (s *Service) initTracing() func() {
 		s.Logger.Warn("OTEL_EXPORTER_OTLP_ENDPOINT is not set, skipping tracing initialization")
 		return func() {}
 	}
+
+	// Strip possible scheme from endpoint
+	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "http://")
+	otlpEndpoint = strings.TrimPrefix(otlpEndpoint, "https://")
 
 	s.Logger.Infof("OTEL_EXPORTER_OTLP_ENDPOINT: %s", otlpEndpoint)
 
