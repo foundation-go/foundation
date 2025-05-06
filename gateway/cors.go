@@ -29,6 +29,7 @@ var (
 		fhttp.HeaderXPerPage,
 		fhttp.HeaderXTotal,
 		fhttp.HeaderXTotalPages,
+		fhttp.HeaderXRequestID,
 	}
 )
 

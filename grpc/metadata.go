@@ -22,6 +22,7 @@ func MetadataUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.U
 	ctx = fctx.WithUserID(ctx, getUserID(ctx))
 	ctx = fctx.WithAccessToken(ctx, getAccessToken(ctx))
 	ctx = fctx.WithAuthenticated(ctx, getAuthenticated(ctx))
+	ctx = fctx.WithRequestID(ctx, getRequestID(ctx))
 
 	resp, err = handler(ctx, req)
 
@@ -86,4 +87,9 @@ func getAccessToken(ctx context.Context) string {
 // getAuthenticated returns the authenticated flag from the specified gRPC context.
 func getAuthenticated(ctx context.Context) bool {
 	return GetMetadataValue(ctx, strings.ToLower(fhttp.HeaderXAuthenticated)) == "true"
+}
+
+// getRequestID returns the request ID from the specified gRPC context.
+func getRequestID(ctx context.Context) string {
+	return GetMetadataValue(ctx, strings.ToLower(fhttp.HeaderXRequestID))
 }

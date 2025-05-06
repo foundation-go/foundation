@@ -36,12 +36,18 @@ func WithRequestLogger(l *log.Entry) func(http.Handler) http.Handler {
 			// Record the start time of the request
 			started := time.Now()
 
-			// Generate the request ID
-			requestID := uuid.New().String()
+			// Generate correlation ID
+			correlationID := uuid.New().String()
 			// pass it down to app
-			request.Header.Set(fhttp.HeaderXCorrelationID, requestID)
+			request.Header.Set(fhttp.HeaderXCorrelationID, correlationID)
 			// write it to HTTP response
-			writer.Header().Set(fhttp.HeaderXCorrelationID, requestID)
+			writer.Header().Set(fhttp.HeaderXCorrelationID, correlationID)
+
+			// Use the existing request ID if it exists in response headers
+			requestID := request.Header.Get(fhttp.HeaderXRequestID)
+			if requestID != "" {
+				writer.Header().Set(fhttp.HeaderXRequestID, requestID)
+			}
 
 			// Add the logger to the request context
 			l = l.WithFields(log.Fields{

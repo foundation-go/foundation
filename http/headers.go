@@ -46,6 +46,9 @@ const (
 
 	// HeaderXUserID contains the user ID.
 	HeaderXUserID = "X-User-Id"
+
+	// HeaderXRequestID contains the request ID.
+	HeaderXRequestID = "X-Request-Id"
 )
 
 // FoundationHeaders is a list of all Foundation HTTP headers.
@@ -62,4 +65,5 @@ var FoundationHeaders = []string{
 	HeaderXTotal,
 	HeaderXTotalPages,
 	HeaderXUserID,
+	HeaderXRequestID,
 }

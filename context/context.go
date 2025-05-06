@@ -19,6 +19,7 @@ const (
 	CtxKeyScopes        CtxKey = "scopes"
 	CtxKeyTX            CtxKey = "tx"
 	CtxKeyUserID        CtxKey = "user_id"
+	CtxKeyRequestID     CtxKey = "request_id"
 )
 
 // Oauth2Scopes represents a list of OAuth scopes.
@@ -135,4 +136,14 @@ func GetTX(ctx context.Context) pgx.Tx {
 // WithTX sets the transaction to the context
 func WithTX(ctx context.Context, tx pgx.Tx) context.Context {
 	return context.WithValue(ctx, CtxKeyTX, tx)
+}
+
+// GetRequestID returns the request ID from the context.
+func GetRequestID(ctx context.Context) string {
+	return ctx.Value(CtxKeyRequestID).(string)
+}
+
+// WithRequestID sets the request ID to the context
+func WithRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, CtxKeyRequestID, requestID)
 }
