@@ -55,6 +55,8 @@ type GatewayOptions struct {
 	CORSOptions *gateway.CORSOptions
 	// MarshalOptions are the options for the JSONPb marshaler.
 	MarshalOptions protojson.MarshalOptions
+	// SwaggerFilePath is the path to the swagger JSON file to serve at /api.swagger.json
+	SwaggerFilePath string
 }
 
 // NewGatewayOptions returns a new GatewayOptions with default values.
@@ -132,6 +134,16 @@ func (s *Service) applyMiddleware(mux http.Handler, opts *GatewayOptions) http.H
 
 	// General middleware
 	middleware = append(middleware, gateway.WithRequestLogger(s.Logger), gateway.WithCORSEnabled(opts.CORSOptions))
+
+	// Swagger middleware
+	if opts.SwaggerFilePath != "" {
+		swaggerMiddleware, err := gateway.WithSwagger(opts.SwaggerFilePath)
+		if err != nil {
+			s.Logger.Warnf("Failed to load swagger file: %v", err)
+		} else {
+			middleware = append(middleware, swaggerMiddleware)
+		}
+	}
 
 	// Authentication details middleware
 	if opts.AuthenticationDetailsMiddleware != nil {
