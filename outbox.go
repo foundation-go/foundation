@@ -189,6 +189,35 @@ func (s *Service) WithTransaction(ctx context.Context, f func(tx pgx.Tx) ([]*Eve
 	return nil
 }
 
+// WithResponseTransaction executes the given function in a transaction. If the function
+// returns an event, it will be published. If the function returns a response, it will be returned.
+func (s *Service) WithResponseTransaction(ctx context.Context, f func(tx pgx.Tx) (proto.Message, []*Event, ferr.FoundationError)) (proto.Message, ferr.FoundationError) {
+	tx, err := s.GetPostgreSQL().Begin(ctx)
+	if err != nil {
+		return nil, ferr.NewInternalError(err, "failed to begin transaction")
+	}
+	defer tx.Rollback(ctx) // nolint: errcheck
+
+	response, events, fErr := f(tx)
+	if fErr != nil {
+		return nil, fErr
+	}
+
+	if len(events) > 0 {
+		for i, event := range events {
+			if err = s.PublishEvent(ctx, event, tx); err != nil {
+				return nil, ferr.NewInternalError(err, fmt.Sprintf("failed to publish event %s: %d out of %d", event.ProtoName, i+1, len(events)))
+			}
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, ferr.NewInternalError(err, "failed to commit transaction")
+	}
+
+	return response, nil
+}
+
 // ListOutboxEvents returns a list of outbox events in the order they were created.
 func (s *Service) ListOutboxEvents(ctx context.Context, tx pgx.Tx, limit int32) ([]outboxrepo.FoundationOutboxEvent, ferr.FoundationError) {
 	queries := outboxrepo.New(tx)
