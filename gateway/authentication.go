@@ -63,7 +63,9 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 
 		// Authenticate the token
 		result, err := authenticate(token)
-		if err != nil {
+
+		// If the authentication failed and no result was returned, set the result to an empty AuthenticationResult
+		if err != nil && result == nil {
 			result = &AuthenticationResult{}
 		}
 

@@ -9,7 +9,5 @@ var (
 )
 
 func main() {
-	svc.Start(&f.OutboxCourierOptions{
-		BatchSize: 100,
-	})
+	svc.Start(f.NewOutboxCourierOptions())
 }
