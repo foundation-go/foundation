@@ -1,27 +1,38 @@
 package gateway
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 )
 
-// WithSwagger returns a middleware that serves a swagger JSON file at /api.swagger.json
-// The swagger content is loaded into memory from the file path for efficient serving.
-func WithSwagger(swaggerFilePath string) (func(http.Handler) http.Handler, error) {
-	// Load the swagger file into memory
-	swaggerContent, err := os.ReadFile(swaggerFilePath)
-	if err != nil {
-		return nil, err
+// SwaggerEndpoint defines a mapping between a URL path and a swagger file.
+type SwaggerEndpoint struct {
+	URLPath  string //e.g., "/api.swagger.json"
+	FilePath string //e.g., "api.swagger.json"
+}
+
+// WithSwagger returns a middleware that serves swagger JSON files at specified URL paths.
+// The swagger content is loaded into memory from the file paths for efficient serving.
+func WithSwagger(endpoints []SwaggerEndpoint) (func(http.Handler) http.Handler, error) {
+	swaggerContents := make(map[string][]byte, len(endpoints))
+
+	for _, endpoint := range endpoints {
+		content, err := os.ReadFile(endpoint.FilePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load swagger file %s: %w", endpoint.FilePath, err)
+		}
+
+		swaggerContents[endpoint.URLPath] = content
 	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Only handle the swagger endpoint
-			if r.URL.Path == "/api.swagger.json" && r.Method == http.MethodGet {
+			if content, ok := swaggerContents[r.URL.Path]; ok && r.Method == http.MethodGet {
 				// Set appropriate headers
 				w.Header().Set("Content-Type", "application/json")
-				w.Header().Set("Content-Length", strconv.Itoa(len(swaggerContent)))
+				w.Header().Set("Content-Length", strconv.Itoa(len(content)))
 
 				// Disable caching
 				w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
@@ -29,7 +40,7 @@ func WithSwagger(swaggerFilePath string) (func(http.Handler) http.Handler, error
 				w.Header().Set("Expires", "0")
 
 				// Write the swagger content
-				w.Write(swaggerContent)
+				w.Write(content)
 				return
 			}
 
@@ -38,4 +49,3 @@ func WithSwagger(swaggerFilePath string) (func(http.Handler) http.Handler, error
 		})
 	}, nil
 }
-
