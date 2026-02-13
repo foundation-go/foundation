@@ -49,6 +49,9 @@ const (
 
 	// HeaderXRequestID contains the request ID.
 	HeaderXRequestID = "X-Request-Id"
+
+	// HeaderXWorkspaceID contains the workspace ID.
+	HeaderXWorkspaceID = "X-Workspace-Id"
 )
 
 // FoundationHeaders is a list of all Foundation HTTP headers.
@@ -66,4 +69,5 @@ var FoundationHeaders = []string{
 	HeaderXTotalPages,
 	HeaderXUserID,
 	HeaderXRequestID,
+	HeaderXWorkspaceID,
 }
