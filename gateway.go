@@ -41,6 +41,14 @@ type GatewayOptions struct {
 	Services []*gateway.Service
 	// Timeout for downstream services requests (default: 30 seconds, if constructed with `NewGatewayOptions`)
 	Timeout time.Duration
+	// MuxOpts are additional grpc-gateway ServeMux options.
+	//
+	// Precedence:
+	//  1) Foundation applies its defaults first (incoming/outgoing header matchers, and the default marshaler option).
+	//  2) Then MuxOpts are applied in the order provided.
+	//
+	// This means MuxOpts can override Foundation defaults (e.g. add a later WithMarshalerOption).
+	MuxOpts []gwruntime.ServeMuxOption
 	// AuthenticationDetailsMiddleware is a middleware that populates the request context with authentication details.
 	AuthenticationDetailsMiddleware func(http.Handler) http.Handler
 	// WithAuthentication enables authentication for the gateway.
@@ -53,8 +61,16 @@ type GatewayOptions struct {
 	StartComponentsOptions []StartComponentsOption
 	// CORSOptions are the options for CORS.
 	CORSOptions *gateway.CORSOptions
-	// MarshalOptions are the options for the JSONPb marshaler.
+	// MarshalOptions are used only for the default JSONPb marshaler when Marshaler is nil.
 	MarshalOptions protojson.MarshalOptions
+	// Marshaler overrides the default marshaler used by grpc-gateway.
+	//
+	// If nil, Foundation uses JSONPb configured with MarshalOptions.
+	// If non-nil, MarshalOptions is not applied automatically; include it in your custom marshaler if needed.
+	//
+	// Note: MuxOpts are applied after the default marshaler option, so a later
+	// runtime.WithMarshalerOption(...) in MuxOpts can override this as well.
+	Marshaler gwruntime.Marshaler
 	// SwaggerEndpoints is a list of endpoints to serve swagger JSON files.
 	SwaggerEndpoints []gateway.SwaggerEndpoint
 }
@@ -85,17 +101,25 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 	tracingShutdown := s.initTracing()
 	defer tracingShutdown()
 
+	marshaler := s.Options.Marshaler
+	if marshaler == nil {
+		marshaler = &gwruntime.JSONPb{
+			MarshalOptions: s.Options.MarshalOptions,
+		}
+	}
+
+	muxOpts := []gwruntime.ServeMuxOption{
+		gwruntime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
+		gwruntime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
+		gwruntime.WithMarshalerOption(gwruntime.MIMEWildcard, marshaler),
+	}
+	muxOpts = append(muxOpts, s.Options.MuxOpts...)
+
 	mux, err := gateway.RegisterServices(
 		s.Options.Services,
 		&gateway.RegisterServicesOptions{
-			MuxOpts: []gwruntime.ServeMuxOption{
-				gwruntime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
-				gwruntime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
-				gwruntime.WithMarshalerOption(gwruntime.MIMEWildcard, &gwruntime.JSONPb{
-					MarshalOptions: s.Options.MarshalOptions,
-				}),
-			},
-			TLSDir: s.Config.GRPC.TLSDir,
+			MuxOpts: muxOpts,
+			TLSDir:  s.Config.GRPC.TLSDir,
 		},
 	)
 	if err != nil {
