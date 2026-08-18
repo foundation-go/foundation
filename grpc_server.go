@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"time"
 
-	"github.com/getsentry/sentry-go"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	fg "github.com/foundation-go/foundation/grpc"
@@ -53,18 +54,17 @@ func (s *GRPCServer) Start(opts *GRPCServerOptions) {
 }
 
 func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
+	loggingOptions := []fg.LoggingOption{fg.WithPayloadLogging(s.Config.LogPayloads)}
+
 	// Default interceptors
 	//
 	// N.B.: Interceptors are executed in the order they are defined.
-	defaultInterceptors := []grpc.UnaryServerInterceptor{
-		fg.MetadataUnaryInterceptor,
-		fg.FoundationErrorToStatusUnaryInterceptor,
-		fg.LoggingUnaryInterceptor(s.Logger),
-	}
-
-	// Construct the default server options
 	defaultOptions := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(defaultInterceptors...),
+		grpc.ChainUnaryInterceptor(fg.DefaultUnaryInterceptors(s.Logger, loggingOptions...)...),
+		grpc.ChainStreamInterceptor(fg.DefaultStreamInterceptors(s.Logger, loggingOptions...)...),
+		// Continues the trace the gateway started; without a server handler the
+		// incoming traceparent was dropped and every service began a new trace.
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	}
 
 	// Prepend the default server options in front of the application-defined ones
@@ -85,34 +85,77 @@ func (s *GRPCServer) ServiceFunc(ctx context.Context) error {
 	}
 
 	// Start the server
-	listener := s.acquireListener()
+	listener := s.acquireListener(ctx)
 	server := grpc.NewServer(serverOptions...)
 
 	s.Options.RegisterFunc(server)
 
 	go func() {
 		if err := server.Serve(listener); err != nil {
-			err = fmt.Errorf("failed to start server: %w", err)
-			sentry.CaptureException(err)
-			s.Logger.Fatal(err)
+			s.Fatal(err, "failed to serve gRPC")
 		}
 	}()
 
 	<-ctx.Done()
 
-	// Gracefully stop the server
-	server.GracefulStop()
+	s.stopGRPCServer(server)
 
 	return nil
 }
 
-func (s *Service) acquireListener() net.Listener {
-	port := GetEnvOrInt("PORT", 51051)
-	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
+// grpcForcedStopGrace is how long a forced Stop is given to unwind before the
+// shutdown moves on without it. It is a variable so that tests can shorten it.
+var grpcForcedStopGrace = 5 * time.Second
+
+// stopGRPCServer stops a gRPC server gracefully, falling back to a hard stop
+// when in-flight calls do not finish within the shutdown budget.
+//
+// GracefulStop on its own waits forever: a single stuck streaming RPC used to
+// keep the process alive until the supervisor killed it.
+func (s *Service) stopGRPCServer(server *grpc.Server) {
+	stopped := make(chan struct{})
+
+	go func() {
+		defer close(stopped)
+
+		server.GracefulStop()
+	}()
+
+	timeout := s.shutdownTimeout()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-stopped:
+	case <-timer.C:
+		s.Logger.Warnf("gRPC server did not stop gracefully within %s; forcing it", timeout)
+		server.Stop()
+
+		// Stop closes the listeners and the transports, but it cannot make a
+		// handler that ignores its context return — and GracefulStop only
+		// returns once every handler has. Waiting unconditionally would hand
+		// the rest of the shutdown, Sentry flush included, to a single wedged
+		// handler.
+		grace := time.NewTimer(grpcForcedStopGrace)
+		defer grace.Stop()
+
+		select {
+		case <-stopped:
+		case <-grace.C:
+			s.Logger.Error("gRPC handlers did not return; continuing the shutdown regardless")
+		}
+	}
+}
+
+func (s *Service) acquireListener(ctx context.Context) net.Listener {
+	port := GetEnvOrInt("PORT", DefaultPort)
+
+	var config net.ListenConfig
+
+	listener, err := config.Listen(ctx, "tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
-		err = fmt.Errorf("failed to listen port %d: %w", port, err)
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		s.Fatal(err, fmt.Sprintf("failed to listen on port %d", port))
 	}
 
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)

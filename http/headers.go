@@ -2,17 +2,18 @@ package http
 
 // Standard HTTP headers, that Foundation uses.
 const (
-	HeaderAcceptEncoding             = "Accept-Encoding"
-	HeaderAccept                     = "Accept"
-	HeaderAccessControlAllowHeaders  = "Access-Control-Allow-Headers"
-	HeaderAccessControlAllowMethods  = "Access-Control-Allow-Methods"
-	HeaderAccessControlAllowOrigin   = "Access-Control-Allow-Origin"
-	HeaderAccessControlExposeHeaders = "Access-Control-Expose-Headers"
-	HeaderAccessControlMaxAge        = "Access-Control-Max-Age"
-	HeaderAuthorization              = "Authorization"
-	HeaderContentLength              = "Content-Length"
-	HeaderContentType                = "Content-Type"
-	HeaderResponseType               = "ResponseType"
+	HeaderAcceptEncoding                = "Accept-Encoding"
+	HeaderAccept                        = "Accept"
+	HeaderAccessControlAllowCredentials = "Access-Control-Allow-Credentials"
+	HeaderAccessControlAllowHeaders     = "Access-Control-Allow-Headers"
+	HeaderAccessControlAllowMethods     = "Access-Control-Allow-Methods"
+	HeaderAccessControlAllowOrigin      = "Access-Control-Allow-Origin"
+	HeaderAccessControlExposeHeaders    = "Access-Control-Expose-Headers"
+	HeaderAccessControlMaxAge           = "Access-Control-Max-Age"
+	HeaderAuthorization                 = "Authorization"
+	HeaderContentLength                 = "Content-Length"
+	HeaderContentType                   = "Content-Type"
+	HeaderResponseType                  = "ResponseType"
 )
 
 // Foundation HTTP headers
@@ -50,6 +51,22 @@ const (
 	// HeaderXRequestID contains the request ID.
 	HeaderXRequestID = "X-Request-Id"
 )
+
+// AuthenticationHeaders is the subset of Foundation headers that carries the
+// caller's identity.
+//
+// These headers are produced by the gateway from the result of authenticating
+// the request, and are trusted by every downstream service. They MUST NOT be
+// accepted from clients: a request that arrives with any of them set is
+// attempting to impersonate somebody. The gateway strips them from every
+// incoming request before the middleware chain runs.
+var AuthenticationHeaders = []string{
+	HeaderXAuthenticated,
+	HeaderXClientID,
+	HeaderXMetadata,
+	HeaderXScope,
+	HeaderXUserID,
+}
 
 // FoundationHeaders is a list of all Foundation HTTP headers.
 //

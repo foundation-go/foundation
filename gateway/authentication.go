@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	fctx "github.com/foundation-go/foundation/context"
 	fhttp "github.com/foundation-go/foundation/http"
 	fhydra "github.com/foundation-go/foundation/hydra"
 )
@@ -52,6 +53,33 @@ func WithHydraAuthenticationDetails(handler http.Handler) http.Handler {
 	})
 }
 
+// StripClientAuthenticationHeaders removes every identity-bearing Foundation
+// header from the incoming request.
+//
+// The gateway derives `X-Authenticated`, `X-User-Id`, `X-Client-Id`, `X-Scope`
+// and `X-Metadata` from the authentication result and forwards them to
+// downstream services, which trust them unconditionally. Without this
+// middleware a client can simply send `X-Authenticated: true` together with a
+// victim's `X-User-Id` and be treated as that user — both by the gateway's own
+// `WithAuthentication` and by every service behind it.
+//
+// Foundation installs this as the first middleware in the chain. Disable it
+// only when the gateway sits behind a trusted proxy that sets these headers
+// itself, via `GatewayOptions.TrustInboundAuthenticationHeaders`.
+//
+// Both spellings are removed: the plain header and its `Grpc-Metadata-` alias,
+// which grpc-gateway would otherwise forward as the same gRPC metadata key.
+func StripClientAuthenticationHeaders(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, header := range fhttp.AuthenticationHeaders {
+			r.Header.Del(header)
+			r.Header.Del("Grpc-Metadata-" + header)
+		}
+
+		handler.ServeHTTP(w, r)
+	})
+}
+
 // WithAuthenticationDetails is a middleware that fetches the authentication details using the given authentication function
 func WithAuthenticationDetails(handler http.Handler, authenticate AuthenticationHandler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,9 +91,15 @@ func WithAuthenticationDetails(handler http.Handler, authenticate Authentication
 
 		// Authenticate the token
 		result, err := authenticate(token)
+		if err != nil {
+			// An authentication backend that is down must not fail silently:
+			// every request would simply become unauthenticated with nothing
+			// in the logs to explain the sudden wave of 401s.
+			fctx.GetLogger(r.Context()).WithError(err).Error("Failed to authenticate request")
+		}
 
 		// If the authentication failed and no result was returned, set the result to an empty AuthenticationResult
-		if err != nil && result == nil {
+		if result == nil {
 			result = &AuthenticationResult{}
 		}
 

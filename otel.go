@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 type otlpTransport string
@@ -57,16 +57,26 @@ func (s *Service) initTracing() func() {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(bsp),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(ratio)),
+		// ParentBased matters: a bare ratio sampler re-decides on every hop, so
+		// a request the gateway chose to sample would be dropped by the very
+		// next service and the trace would arrive in pieces. Wrapped like this,
+		// the head of the trace decides and everyone downstream honours it.
+		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(ratio))),
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(s.Name),
+			semconv.ServiceVersionKey.String(Version),
+			semconv.DeploymentEnvironmentKey.String(string(FoundationEnv())),
 		)),
 	)
 	otel.SetTracerProvider(tp)
 
-	// Set the global propagator to use W3C Trace Context.
-	otel.SetTextMapPropagator(propagation.TraceContext{})
+	// W3C Trace Context for the trace itself, plus Baggage so that correlation
+	// values set upstream survive the hop.
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 
 	// Return a function to stop the tracer provider.
 	return func() {
@@ -206,16 +216,25 @@ func isHTTPURL(endpoint string) bool {
 	return strings.HasPrefix(strings.ToLower(endpoint), "http://")
 }
 
+// DefaultTracingRatio is the fraction of traces sampled when
+// OTEL_TRACES_SAMPLER_RATIO is unset.
+//
+// It used to be 0, so configuring an OTLP endpoint produced a service that
+// announced "Tracing ratio: 0.000000" and then exported nothing — while ENV.md
+// documented the default as 1.0. Someone who goes to the trouble of pointing a
+// service at a collector wants its traces.
+const DefaultTracingRatio = 1.0
+
 func getTracingRatio() float64 {
-	ratio := os.Getenv("OTEL_TRACES_SAMPLER_RATIO")
-	if ratio == "" {
-		ratio = "0"
+	raw := strings.TrimSpace(os.Getenv("OTEL_TRACES_SAMPLER_RATIO"))
+	if raw == "" {
+		return DefaultTracingRatio
 	}
 
-	ratioFloat, err := strconv.ParseFloat(ratio, 64)
-	if err != nil {
-		return 0
+	ratio, err := strconv.ParseFloat(raw, 64)
+	if err != nil || ratio < 0 || ratio > 1 {
+		return DefaultTracingRatio
 	}
 
-	return ratioFloat
+	return ratio
 }

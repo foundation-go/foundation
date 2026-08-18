@@ -2,7 +2,9 @@ package errors
 
 import (
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/getsentry/sentry-go"
@@ -21,7 +23,22 @@ type BaseError struct {
 }
 
 func (e *BaseError) Error() string {
+	if e == nil || e.Err == nil {
+		return "unknown error"
+	}
+
 	return e.Err.Error()
+}
+
+// Unwrap exposes the wrapped cause, so that errors.Is and errors.As can reach
+// it. Without this a Foundation error was a dead end: `errors.Is(err,
+// pgx.ErrNoRows)` could never be true, however the error was constructed.
+func (e *BaseError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+
+	return e.Err
 }
 
 // GRPCStatus returns a gRPC status error for the Foundation error.
@@ -82,6 +99,10 @@ func (e *InternalError) MarshalJSON() ([]byte, error) {
 
 // NewInternalError creates a generic internal error.
 func NewInternalError(err error, msg string) *InternalError {
+	if err == nil {
+		err = stderrors.New(msg)
+	}
+
 	return &InternalError{
 		BaseError: &BaseError{
 			Err: errors.Wrap(err, msg),
@@ -108,10 +129,12 @@ func (e *InvalidArgumentError) GRPCStatus() *status.Status {
 	// Create status with error message
 	st := status.New(codes.InvalidArgument, msg)
 
-	// Attach error details
+	// Attach error details, in a stable order: ranging over the map directly
+	// meant the same validation failure produced a different response on every
+	// call, which is confusing to read and impossible to assert on.
 	badRequest := &errdetails.BadRequest{}
-	for field, description := range e.Violations {
-		for _, d := range description {
+	for _, field := range sortedViolationFields(e.Violations) {
+		for _, d := range e.Violations[field] {
 			badRequest.FieldViolations = append(badRequest.FieldViolations, &errdetails.BadRequest_FieldViolation{
 				Field:       fmt.Sprintf("%s#%s", obj, field),
 				Description: d.String(),
@@ -135,8 +158,8 @@ func (e *InvalidArgumentError) MarshalProto() proto.Message {
 		Id:   e.ID,
 	}
 
-	for field, description := range e.Violations {
-		for _, d := range description {
+	for _, field := range sortedViolationFields(e.Violations) {
+		for _, d := range e.Violations[field] {
 			err.Violations = append(err.Violations, &pb.InvalidArgumentError_Violation{
 				Field:       field,
 				Description: d.String(),
@@ -145,6 +168,18 @@ func (e *InvalidArgumentError) MarshalProto() proto.Message {
 	}
 
 	return err
+}
+
+// sortedViolationFields returns the violated field names in a stable order.
+func sortedViolationFields(violations ErrorViolations) []string {
+	fields := make([]string, 0, len(violations))
+	for field := range violations {
+		fields = append(fields, field)
+	}
+
+	sort.Strings(fields)
+
+	return fields
 }
 
 // MarshalJSON marshals the error to JSON.
@@ -192,7 +227,15 @@ func (e *NotFoundError) MarshalJSON() ([]byte, error) {
 }
 
 // NewNotFoundError creates a not found error.
+//
+// A nil cause is accepted — callers frequently have nothing better to report
+// than "it is not there" — and is replaced with a descriptive error, so that
+// formatting the result never dereferences nil.
 func NewNotFoundError(err error, kind string, id string) *NotFoundError {
+	if err == nil {
+		err = fmt.Errorf("not found: %s/%s", kind, id)
+	}
+
 	return &NotFoundError{
 		BaseError: &BaseError{
 			Err: err,

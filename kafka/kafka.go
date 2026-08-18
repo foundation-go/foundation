@@ -1,19 +1,20 @@
 package kafka
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"github.com/segmentio/kafka-go/sasl"
-	"github.com/segmentio/kafka-go/sasl/plain"
-	"github.com/segmentio/kafka-go/sasl/scram"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"github.com/segmentio/kafka-go/sasl"
+	"github.com/segmentio/kafka-go/sasl/plain"
+	"github.com/segmentio/kafka-go/sasl/scram"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,6 +29,66 @@ const (
 	ProducerComponentName = "kafka-producer"
 )
 
+// DefaultHealthTimeout bounds a health check made without a context.
+const DefaultHealthTimeout = 2 * time.Second
+
+// newHealthClient builds the client used to probe broker reachability.
+func newHealthClient(brokers []string, transport kafka.RoundTripper) *kafka.Client {
+	return &kafka.Client{
+		Addr:      kafka.TCP(brokers...),
+		Timeout:   DefaultHealthTimeout,
+		Transport: transport,
+	}
+}
+
+// pingBrokers performs the cheapest possible round-trip to a broker. Unlike a
+// metadata request it does not enumerate topics, so it stays cheap on large
+// clusters even when a probe runs every few seconds.
+func pingBrokers(ctx context.Context, client *kafka.Client) error {
+	if client == nil {
+		return errors.New("kafka client is not initialized")
+	}
+
+	resp, err := client.ApiVersions(ctx, &kafka.ApiVersionsRequest{})
+	if err != nil {
+		return fmt.Errorf("kafka brokers are unreachable: %w", err)
+	}
+
+	if resp.Error != nil {
+		return fmt.Errorf("kafka brokers reported an error: %w", resp.Error)
+	}
+
+	return nil
+}
+
+// validateBrokers rejects a broker list that cannot possibly work.
+//
+// strings.Split("", ",") yields a slice holding one empty string, so an unset
+// KAFKA_BROKERS used to reach kafka-go as a single broker with an empty
+// address, which it retried against forever instead of failing at startup.
+func validateBrokers(brokers []string) error {
+	if len(brokers) == 0 {
+		return errors.New("no Kafka brokers configured: set KAFKA_BROKERS")
+	}
+
+	for _, broker := range brokers {
+		if strings.TrimSpace(broker) == "" {
+			return fmt.Errorf("invalid Kafka broker list %v: contains an empty address", brokers)
+		}
+	}
+
+	return nil
+}
+
+// defaultLogger returns a usable logger for components built without one.
+func defaultLogger(logger *logrus.Entry, componentName string) *logrus.Entry {
+	if logger == nil {
+		return logrus.NewEntry(logrus.StandardLogger()).WithField("component", componentName)
+	}
+
+	return logger
+}
+
 type ConsumerComponent struct {
 	Consumer *kafka.Reader
 
@@ -37,6 +98,8 @@ type ConsumerComponent struct {
 	saslMechanism sasl.Mechanism
 	topics        []string
 	tlsDir        string
+	group         string
+	healthClient  *kafka.Client
 }
 
 // ConsumerComponentOption represents an option for the ConsumerComponent
@@ -70,6 +133,17 @@ func WithConsumerTopics(topics []string) ConsumerComponentOption {
 	}
 }
 
+// WithConsumerGroupID overrides the Kafka consumer group the component joins.
+//
+// It defaults to "<app name>-foundation", which puts every events worker of an
+// application into the same group: two workers reading different topics then
+// fight over partition assignment on every rebalance.
+func WithConsumerGroupID(groupID string) ConsumerComponentOption {
+	return func(c *ConsumerComponent) {
+		c.group = groupID
+	}
+}
+
 // WithConsumerTLSDir sets the location of the TLS directory for the ConsumerComponent
 func WithConsumerTLSDir(tlsDir string) ConsumerComponentOption {
 	return func(c *ConsumerComponent) {
@@ -100,18 +174,37 @@ func NewConsumerComponent(opts ...ConsumerComponentOption) *ConsumerComponent {
 	return c
 }
 
+// log returns the component logger, or a usable default.
+func (c *ConsumerComponent) log() *logrus.Entry {
+	return defaultLogger(c.logger, ConsumerComponentName)
+}
+
+// groupID returns the consumer group the reader joins.
+func (c *ConsumerComponent) groupID() string {
+	if c.group != "" {
+		return c.group
+	}
+
+	return fmt.Sprintf("%s-foundation", c.appName)
+}
+
 // Start implements the Component interface.
 func (c *ConsumerComponent) Start() error {
 	if len(c.topics) == 0 {
 		return errors.New("you must specify topics during the application initialization using the `WithKafkaConsumerTopics`")
 	}
-	c.logger.Debugf("Kafka consumer topics: %v", c.topics)
+
+	if err := validateBrokers(c.brokers); err != nil {
+		return err
+	}
+
+	c.log().Debugf("Kafka consumer topics: %v", c.topics)
 
 	config := kafka.ReaderConfig{
 		Brokers:     c.brokers,
-		GroupID:     fmt.Sprintf("%s-foundation", c.appName),
+		GroupID:     c.groupID(),
 		GroupTopics: c.topics,
-		ErrorLogger: c.logger,
+		ErrorLogger: c.log(),
 	}
 
 	dialer, err := newDialer(c.tlsDir, c.saslMechanism)
@@ -121,27 +214,43 @@ func (c *ConsumerComponent) Start() error {
 
 	config.Dialer = dialer
 
-	consumer := kafka.NewReader(config)
+	transport, err := newTransport(c.tlsDir, c.saslMechanism)
+	if err != nil {
+		return err
+	}
 
-	c.Consumer = consumer
+	c.healthClient = newHealthClient(c.brokers, transport)
+	c.Consumer = kafka.NewReader(config)
 
 	return nil
 }
 
 // Stop implements the Component interface.
 func (c *ConsumerComponent) Stop() error {
+	if c.Consumer == nil {
+		return nil
+	}
+
 	return c.Consumer.Close()
 }
 
 // Health implements the Component interface.
 func (c *ConsumerComponent) Health() error {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultHealthTimeout)
+	defer cancel()
+
+	return c.HealthContext(ctx)
+}
+
+// HealthContext implements the HealthCheckerContext interface.
+func (c *ConsumerComponent) HealthContext(ctx context.Context) error {
 	if c.Consumer == nil {
 		return errors.New("reader is not initialized")
 	}
 
-	// TODO: find a way to check the health of the consumer.
-
-	return nil
+	// This used to be a TODO that always returned nil, so an unreachable Kafka
+	// never showed up in the readiness probe.
+	return pingBrokers(ctx, c.healthClient)
 }
 
 // Name implements the Component interface.
@@ -153,12 +262,14 @@ func (c *ConsumerComponent) Name() string {
 type ProducerComponent struct {
 	Producer *kafka.Writer
 
-	brokers       []string
-	logger        *logrus.Entry
-	tlsDir        string
-	batchSize     int
-	batchTimeout  time.Duration
-	saslMechanism sasl.Mechanism
+	brokers              []string
+	logger               *logrus.Entry
+	tlsDir               string
+	batchSize            int
+	batchTimeout         time.Duration
+	saslMechanism        sasl.Mechanism
+	allowAutoTopicCreate bool
+	healthClient         *kafka.Client
 }
 
 // ProducerComponentOption represents an option for the ProducerComponent
@@ -197,6 +308,18 @@ func WithProducerTLSDir(tlsDir string) ProducerComponentOption {
 	}
 }
 
+// WithProducerAllowAutoTopicCreation controls whether writing to an unknown
+// topic creates it.
+//
+// Convenient in development, risky in production: a typo in a topic name
+// silently creates a topic with the cluster's default partitioning instead of
+// failing.
+func WithProducerAllowAutoTopicCreation(allow bool) ProducerComponentOption {
+	return func(c *ProducerComponent) {
+		c.allowAutoTopicCreate = allow
+	}
+}
+
 // WithProducerBatchSize sets the batching size for the ProducerComponent
 func WithProducerBatchSize(batchSize int) ProducerComponentOption {
 	return func(c *ProducerComponent) {
@@ -222,40 +345,61 @@ func NewProducerComponent(opts ...ProducerComponentOption) *ProducerComponent {
 	return c
 }
 
+// log returns the component logger, or a usable default.
+func (c *ProducerComponent) log() *logrus.Entry {
+	return defaultLogger(c.logger, ProducerComponentName)
+}
+
 // Start implements the Component interface.
 func (c *ProducerComponent) Start() error {
+	if err := validateBrokers(c.brokers); err != nil {
+		return err
+	}
+
 	transport, err := newTransport(c.tlsDir, c.saslMechanism)
 	if err != nil {
 		return err
 	}
 
-	producer := &kafka.Writer{
+	c.healthClient = newHealthClient(c.brokers, transport)
+
+	c.Producer = &kafka.Writer{
 		Addr:                   kafka.TCP(c.brokers...),
-		AllowAutoTopicCreation: true,
+		AllowAutoTopicCreation: c.allowAutoTopicCreate,
 		BatchSize:              c.batchSize,
 		BatchTimeout:           c.batchTimeout,
-		Logger:                 c.logger,
+		Logger:                 c.log(),
 		Transport:              transport,
 		Balancer:               &kafka.Hash{}, // distribute messages to partitions based on the hash of the key, round-robin if no key
 	}
-
-	c.Producer = producer
 
 	return nil
 }
 
 // Stop implements the Component interface.
 func (c *ProducerComponent) Stop() error {
+	if c.Producer == nil {
+		return nil
+	}
+
 	return c.Producer.Close()
 }
 
 // Health implements the Component interface.
 func (c *ProducerComponent) Health() error {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultHealthTimeout)
+	defer cancel()
+
+	return c.HealthContext(ctx)
+}
+
+// HealthContext implements the HealthCheckerContext interface.
+func (c *ProducerComponent) HealthContext(ctx context.Context) error {
 	if c.Producer == nil {
 		return errors.New("writer is not initialized")
 	}
 
-	return nil
+	return pingBrokers(ctx, c.healthClient)
 }
 
 // Name implements the Component interface.
@@ -315,30 +459,40 @@ func newTransport(tlsDir string, saslMechanism sasl.Mechanism) (*kafka.Transport
 	}, nil
 }
 
+// newTLSConfig loads the client certificate, key and CA from dir.
+//
+// The file names follow the Kubernetes TLS secret convention: `tls.crt`,
+// `tls.key` and `ca.crt`.
 func newTLSConfig(dir string) (*tls.Config, error) {
 	certFile := filepath.Join(dir, "tls.crt")
 	keyFile := filepath.Join(dir, "tls.key")
 	caFile := filepath.Join(dir, "ca.crt")
 
-	tlsConfig := &tls.Config{}
-
-	// Load client cert
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load the Kafka client certificate from %s: %w", dir, err)
 	}
-	tlsConfig.Certificates = []tls.Certificate{cert}
 
-	// Load CA cert
+	// #nosec G304 -- the path is assembled from an operator-supplied
+	// certificate directory, which is configuration rather than user input.
 	caCert, err := os.ReadFile(caFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read the Kafka CA certificate: %w", err)
 	}
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-	tlsConfig.RootCAs = caCertPool
 
-	return tlsConfig, nil
+	caCertPool := x509.NewCertPool()
+	// The result was discarded, so a malformed CA file produced an empty pool
+	// and every connection failed the handshake with nothing to suggest the CA
+	// had simply failed to parse.
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("no certificates could be parsed from %s", caFile)
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      caCertPool,
+		MinVersion:   tls.VersionTLS12,
+	}, nil
 }
 
 // newSASLMechanism return a SASL mechanism

@@ -36,22 +36,26 @@ func NewClient(rdc *redis.Client, redisChannel string) *Client {
 	return &Client{Redis: rdc, RedisChannel: redisChannel}
 }
 
-func (c *Client) BroadcastMessage(msgName string, msg proto.Message, stream, correlationID string) error {
+// BroadcastMessage publishes a message to an AnyCable stream.
+//
+// The context bounds the Redis publish; it used to be context.Background(), so
+// an unresponsive Redis blocked the courier indefinitely and held up shutdown
+// with it.
+func (c *Client) BroadcastMessage(ctx context.Context, msgName string, msg proto.Message, stream, correlationID string) error {
 	msgJSON, err := newEventJSONFromMessage(msgName, msg, stream, correlationID)
 	if err != nil {
 		return fmt.Errorf("failed to marshal anycable message: %w", err)
 	}
 
-	err = c.publish(msgJSON)
-	if err != nil {
+	if err = c.publish(ctx, msgJSON); err != nil {
 		return fmt.Errorf("failed to publish anycable message: %w", err)
 	}
 
 	return nil
 }
 
-func (c *Client) publish(msg string) error {
-	return c.Redis.Publish(context.Background(), c.RedisChannel, msg).Err()
+func (c *Client) publish(ctx context.Context, msg string) error {
+	return c.Redis.Publish(ctx, c.RedisChannel, msg).Err()
 }
 
 func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stream string, correlationID string) (string, error) {
@@ -76,21 +80,22 @@ func newEventJSONFromMessage(msgName string, msg protoreflect.ProtoMessage, stre
 		return "", fmt.Errorf("failed to marshal event data: %w", err)
 	}
 
-	type tmpWrapper struct {
-		Data string `json:"data"`
-	}
-	tmp := tmpWrapper{string(res)}
-
-	res, err = json.Marshal(tmp)
+	// AnyCable expects `data` to hold the JSON *text* of the payload, so what
+	// goes in the field is the payload's JSON string literal — quotes and
+	// escaping included.
+	//
+	// This used to be produced by marshalling a throwaway {"data": ...} struct
+	// and slicing the result with hardcoded offsets, res[9:len(res)-2], which
+	// only worked as long as nobody touched that struct's field name. Encoding
+	// the string directly does the same thing and says so.
+	quoted, err := json.Marshal(string(res))
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal event data wrapper: %w", err)
+		return "", fmt.Errorf("failed to encode event data as a JSON string: %w", err)
 	}
-
-	res = res[9 : len(res)-2]
 
 	event := &Event{
 		Stream: stream,
-		Data:   fmt.Sprintf("\"%s\"", string(res)),
+		Data:   string(quoted),
 	}
 
 	res, err = json.Marshal(event)

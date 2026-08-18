@@ -3,10 +3,7 @@ package foundation
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
-
-	"github.com/getsentry/sentry-go"
 )
 
 // HTTPServer represents a HTTP Server mode Foundation service.
@@ -49,29 +46,22 @@ func (s *HTTPServer) Start(opts *HTTPServerOptions) {
 }
 
 func (s *HTTPServer) ServiceFunc(ctx context.Context) error {
-	port := GetEnvOrInt("PORT", 51051)
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: s.Options.Handler,
-	}
+	port := GetEnvOrInt("PORT", DefaultPort)
+	server := s.newHTTPServer(port, s.Options.Handler)
 
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			err = fmt.Errorf("failed to start HTTP server: %w", err)
-			sentry.CaptureException(err)
-			s.Logger.Fatal(err)
+			s.Fatal(err, "failed to start HTTP server")
 		}
 	}()
 
 	<-ctx.Done()
 
 	// Gracefully stop the HTTP server
-	if err := server.Shutdown(context.Background()); err != nil {
-		err = fmt.Errorf("failed to gracefully shutdown HTTP server: %w", err)
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+	if err := s.shutdownHTTPServer(server); err != nil {
+		s.CaptureError(err, "failed to gracefully shutdown HTTP server")
 	}
 
 	return nil

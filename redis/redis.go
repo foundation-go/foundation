@@ -2,7 +2,8 @@ package redis
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -10,6 +11,9 @@ import (
 
 const (
 	ComponentName = "redis"
+
+	// DefaultHealthTimeout bounds a health check made without a context.
+	DefaultHealthTimeout = 2 * time.Second
 )
 
 type Component struct {
@@ -46,6 +50,16 @@ func NewComponent(opts ...ComponentOption) *Component {
 	return c
 }
 
+// log returns the component logger, or a usable default when the component was
+// built without one.
+func (c *Component) log() *logrus.Entry {
+	if c.logger == nil {
+		return logrus.NewEntry(logrus.StandardLogger()).WithField("component", c.Name())
+	}
+
+	return c.logger
+}
+
 // Start implements the Component interface.
 func (c *Component) Start() error {
 	opts, err := redis.ParseURL(c.url)
@@ -60,23 +74,30 @@ func (c *Component) Start() error {
 
 // Stop implements the Component interface.
 func (c *Component) Stop() error {
-	c.logger.Info("Disconnecting from Redis...")
+	if c.Connection == nil {
+		return nil
+	}
+
+	c.log().Info("Disconnecting from Redis...")
 
 	return c.Connection.Close()
 }
 
 // Health implements the Component interface.
 func (c *Component) Health() error {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultHealthTimeout)
+	defer cancel()
+
+	return c.HealthContext(ctx)
+}
+
+// HealthContext implements the HealthCheckerContext interface.
+func (c *Component) HealthContext(ctx context.Context) error {
 	if c.Connection == nil {
-		return fmt.Errorf("connection is not initialized")
+		return errors.New("connection is not initialized")
 	}
 
-	status := c.Connection.Ping(context.Background())
-	if status.Err() != nil {
-		return status.Err()
-	}
-
-	return nil
+	return c.Connection.Ping(ctx).Err()
 }
 
 // Name implements the Component interface.

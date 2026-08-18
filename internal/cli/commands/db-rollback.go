@@ -3,16 +3,15 @@ package commands
 import (
 	"fmt"
 	"log"
-	"os"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/spf13/cobra"
-
-	f "github.com/foundation-go/foundation"
-	h "github.com/foundation-go/foundation/internal/cli/helpers"
 )
+
+// rollbackStepsFlag is referenced both when the flag is registered and when it
+// is read, so the two cannot drift apart again.
+const rollbackStepsFlag = "steps"
 
 var DBRollback = &cobra.Command{
 	Use:     "db:rollback",
@@ -20,50 +19,38 @@ var DBRollback = &cobra.Command{
 	Short:   "Rollback database migrations",
 	Long:    "Rollback database migrations by a given number of steps, e.g.: `foundation db:rollback --steps 2`",
 	Run: func(cmd *cobra.Command, _ []string) {
-		var dir string
-		databaseURL := f.GetEnvOrString("DATABASE_URL", "")
-
-		if f.IsProductionEnv() {
-			dir = cmd.Flag("dir").Value.String()
-			if dir == "" {
-				log.Fatal("You should specify the directory containing migrations with the `--dir` flag")
-			}
-		} else {
-			if !h.BuiltOnFoundation() {
-				log.Fatal("This command must be run from inside a Foundation service")
-			}
-
-			dir = h.AtServiceRoot(MigrationsDirectory)
-		}
-
-		// Check if migrations directory exists
-		_, err := os.Stat(dir)
-		if os.IsNotExist(err) {
-			log.Fatalf("Migrations directory `%s` does not exist", dir)
-		}
-
-		// Parse `steps` flag
-		steps, err := cmd.Flags().GetInt("step")
-		if err != nil || steps <= 0 {
-			log.Fatal("You should set `--steps` flag to a positive integer")
-		}
-
-		// Check if `DATABASE_URL` environment variable is set
-		if databaseURL == "" {
-			log.Fatal("`DATABASE_URL` environment variable is not set")
-		}
-
-		// Initialize migrator
-		m, err := migrate.New(fmt.Sprintf("file://%s", dir), databaseURL)
+		dir, err := migrationsDir(cmd.Flag("dir").Value.String())
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		// Rollback migrations
-		if err = m.Steps(-1 * steps); err != nil {
+		steps, err := rollbackSteps(cmd)
+		if err != nil {
 			log.Fatal(err)
 		}
+
+		m, err := newMigrator(dir)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer closeMigrator(m)
+
+		reportMigrationResult(m.Steps(-1*steps), "Nothing to roll back")
 	},
+}
+
+// rollbackSteps reads and validates the number of migrations to roll back.
+func rollbackSteps(cmd *cobra.Command) (int, error) {
+	steps, err := cmd.Flags().GetInt(rollbackStepsFlag)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read `--%s`: %w", rollbackStepsFlag, err)
+	}
+
+	if steps <= 0 {
+		return 0, fmt.Errorf("`--%s` must be a positive integer, got %d", rollbackStepsFlag, steps)
+	}
+
+	return steps, nil
 }
 
 func init() {
@@ -72,5 +59,5 @@ func init() {
 		log.Fatal(err)
 	}
 
-	DBRollback.Flags().Int32P("steps", "s", 1, "Number of migrations to rollback")
+	DBRollback.Flags().IntP(rollbackStepsFlag, "s", 1, "Number of migrations to rollback")
 }

@@ -4,11 +4,12 @@ import (
 	"context"
 	"strings"
 
-	fctx "github.com/foundation-go/foundation/context"
-	fhttp "github.com/foundation-go/foundation/http"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	fctx "github.com/foundation-go/foundation/context"
+	fhttp "github.com/foundation-go/foundation/http"
 )
 
 // MetadataUnaryInterceptor sets values passed by the gateway from the gRPC metadata into the context.
@@ -16,6 +17,13 @@ import (
 // This is implemented to standardize the retrieval of common values from the context, regardless of whether
 // we are writing gRPC or Event Bus handlers.
 func MetadataUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	return handler(contextFromMetadata(ctx), req)
+}
+
+// contextFromMetadata copies the values the gateway forwards as gRPC metadata
+// into the context, so that handlers read them the same way regardless of
+// whether they were reached over gRPC or through the event bus.
+func contextFromMetadata(ctx context.Context) context.Context {
 	ctx = fctx.WithCorrelationID(ctx, getCorrelationID(ctx))
 	ctx = fctx.WithClientID(ctx, getClientID(ctx))
 	ctx = fctx.WithScopes(ctx, getScopes(ctx))
@@ -24,20 +32,34 @@ func MetadataUnaryInterceptor(ctx context.Context, req interface{}, info *grpc.U
 	ctx = fctx.WithAuthenticated(ctx, getAuthenticated(ctx))
 	ctx = fctx.WithRequestID(ctx, getRequestID(ctx))
 
-	resp, err = handler(ctx, req)
-
-	return resp, err
+	return ctx
 }
 
 // GetMetadataValue retrieves the value of a specified key from the metadata of a gRPC context.
-func GetMetadataValue(ctx context.Context, key string) (s string) {
-	if md, ok := metadata.FromIncomingContext(ctx); ok {
-		if p, ok := md[key]; ok {
-			s = strings.Join(p, ",")
-		}
+//
+// When a key carries several values only the first is returned. Joining them —
+// as this used to do, with a comma — produces a string that is not a valid
+// value of anything: a duplicated `x-user-id` became `id1,id2`, and a
+// duplicated `x-scope` became `scopeA,scopeB scopeC`, which then split on
+// whitespace into scopes that were never granted.
+func GetMetadataValue(ctx context.Context, key string) string {
+	values := GetMetadataValues(ctx, key)
+	if len(values) == 0 {
+		return ""
 	}
 
-	return
+	return values[0]
+}
+
+// GetMetadataValues retrieves every value stored under a key in the metadata of
+// a gRPC context.
+func GetMetadataValues(ctx context.Context, key string) []string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	return md[key]
 }
 
 // getCorrelationID returns the correlation ID from the specified gRPC context.

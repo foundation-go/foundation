@@ -1,4 +1,20 @@
-.PHONY: compile-proto
+.PHONY: test test-integration lint compile-proto
+
+# The unit suite. Fast, no Docker, race detector on — the request loggers shared
+# one logrus entry across every in-flight request until something ran this.
+test:
+	go test -race ./...
+
+# The integration suite drives real Postgres, Redis and Kafka containers. It
+# lives in its own module so that testcontainers' dependency graph stays out of
+# the framework's go.mod, and needs a running Docker daemon.
+test-integration:
+	cd test/integration && go test -tags=integration -timeout 20m ./...
+
+lint:
+	golangci-lint run ./...
+	cd test/integration && golangci-lint run --build-tags=integration ./...
+
 
 compile-proto:
 	protoc --go_out=. --go_opt=paths=source_relative \

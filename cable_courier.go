@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/getsentry/sentry-go"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
+
 	cablecourier "github.com/foundation-go/foundation/cable/courier"
 	ferr "github.com/foundation-go/foundation/errors"
 	ferrpb "github.com/foundation-go/foundation/errors/proto"
 	fkafka "github.com/foundation-go/foundation/kafka"
-	"github.com/getsentry/sentry-go"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/protobuf/proto"
 )
 
 // CableCourier is a mode in which events are received from Kafka and published
@@ -58,6 +59,13 @@ type CableCourierOptions struct {
 func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]EventHandler {
 	handlers := make(map[proto.Message][]EventHandler)
 
+	// A courier constructed as &CableCourierOptions{} has a nil map, and the
+	// default error resolvers below used to be written straight into it:
+	// "assignment to entry in nil map".
+	if opts.Resolvers == nil {
+		opts.Resolvers = make(CableCourierResolvers)
+	}
+
 	errors := []proto.Message{
 		&ferrpb.InternalError{},
 		&ferrpb.UnauthenticatedError{},
@@ -67,13 +75,27 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 		&ferrpb.InvalidArgumentError{},
 	}
 
-	// Add default resolvers for errors, if not already defined
+	// Add default resolvers for the error types the caller has not covered.
+	//
+	// The check has to be by proto name, not by map key. The keys here are
+	// pointers, so a caller who registered their own `&ferrpb.InternalError{}`
+	// holds a different key from the one built above: looking up by key missed
+	// it and added a second entry for the same event type. That used to mean
+	// one of the two resolvers was silently dropped; now that the events worker
+	// rejects duplicate registrations, it would stop the courier from starting
+	// at all.
+	registered := make(map[string]bool, len(opts.Resolvers))
+	for protoObj := range opts.Resolvers {
+		registered[ProtoToName(protoObj)] = true
+	}
+
 	for _, err := range errors {
-		if _, ok := opts.Resolvers[err]; !ok {
-			opts.Resolvers[err] = []CableMessageResolver{
-				CableDefaultErrorResolver,
-			}
+		if registered[ProtoToName(err)] {
+			continue
 		}
+
+		opts.Resolvers[err] = []CableMessageResolver{CableDefaultErrorResolver}
+		registered[ProtoToName(err)] = true
 	}
 
 	// Wrap resolvers into event handlers
@@ -91,10 +113,20 @@ func (opts *CableCourierOptions) EventHandlers(s *Service) map[proto.Message][]E
 	return handlers
 }
 
+// DefaultAnyCableRedisChannel is the Redis PubSub channel AnyCable listens on.
+const DefaultAnyCableRedisChannel = "__anycable__"
+
 // Start runs a cable_courier worker using the given CableCourierOptions.
 func (c *CableCourier) Start(opts *CableCourierOptions) {
-	if opts != nil && opts.RedisChannel == "" {
-		opts.RedisChannel = GetEnvOrString("ANYCABLE_REDIS_CHANNEL", "__anycable__")
+	// The nil check used to guard only the channel default, while
+	// opts.EventHandlers below was called unconditionally — so a nil opts
+	// produced a nil dereference two lines later instead of a clear error.
+	if opts == nil {
+		opts = &CableCourierOptions{}
+	}
+
+	if opts.RedisChannel == "" {
+		opts.RedisChannel = GetEnvOrString("ANYCABLE_REDIS_CHANNEL", DefaultAnyCableRedisChannel)
 	}
 
 	ewOpts := &EventsWorkerOptions{
@@ -103,6 +135,13 @@ func (c *CableCourier) Start(opts *CableCourierOptions) {
 		StartComponentsOptions: []StartComponentsOption{
 			WithRedis(),
 		},
+	}
+
+	// Errors are published to EVENTS_WORKER_ERRORS_TOPIC when it is set, which
+	// is not a topic any handled proto name would produce. Subscribe to it too,
+	// or the courier would never see the errors it exists to deliver.
+	if errorsTopic := c.Config.EventsWorker.ErrorsTopic; errorsTopic != "" {
+		ewOpts.Topics = append(ewOpts.GetTopics(), errorsTopic)
 	}
 
 	c.EventsWorker.Start(ewOpts)
@@ -131,6 +170,7 @@ func (h *CableMessageEventHandler) Handle(ctx context.Context, event *Event, msg
 	// Broadcast the message to the stream.
 	// If the broadcast fails, we log the error, capture it with Sentry and go on to avoid infinite loops.
 	err = cablecourier.NewClient(h.Service.GetRedis(), h.RedisChannel).BroadcastMessage(
+		ctx,
 		event.ProtoName,
 		msg,
 		stream,

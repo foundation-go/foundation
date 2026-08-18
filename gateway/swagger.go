@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+
+	fctx "github.com/foundation-go/foundation/context"
 )
 
 // SwaggerEndpoint defines a mapping between a URL path and a swagger file.
@@ -40,7 +42,10 @@ func WithSwagger(endpoints []SwaggerEndpoint) (func(http.Handler) http.Handler, 
 				w.Header().Set("Expires", "0")
 
 				// Write the swagger content
-				w.Write(content)
+				if _, err := w.Write(content); err != nil {
+					fctx.GetLogger(r.Context()).WithError(err).Warn("Failed to write the swagger document")
+				}
+
 				return
 			}
 

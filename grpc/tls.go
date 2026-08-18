@@ -30,16 +30,25 @@ func NewTLSConfig(tlsDir string) (credentials.TransportCredentials, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load server certificate: %w", err)
 	}
+	// #nosec G304 -- the path is assembled from an operator-supplied
+	// certificate directory, which is configuration rather than user input.
 	caCert, err := os.ReadFile(caFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
 	}
+
 	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
+	// The result was discarded, so a malformed CA file produced an empty pool
+	// and every client certificate was rejected with a TLS handshake error
+	// giving no hint that the CA had simply failed to parse.
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("no certificates could be parsed from %s", caFile)
+	}
 
 	return credentials.NewTLS(&tls.Config{
 		Certificates: []tls.Certificate{peerCert},
 		ClientCAs:    caCertPool,
 		ClientAuth:   tls.RequireAndVerifyClientCert,
+		MinVersion:   tls.VersionTLS12,
 	}), nil
 }

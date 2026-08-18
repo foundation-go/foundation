@@ -5,10 +5,11 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/jackc/pgx/v5"
+
 	f "github.com/foundation-go/foundation"
 	ferr "github.com/foundation-go/foundation/errors"
 	pb "github.com/foundation-go/foundation/examples/clubchat/protos/chats"
-	"github.com/jackc/pgx/v5"
 )
 
 func (s *chatsServer) SendMessage(ctx context.Context, req *pb.SendMessageRequest) (*pb.Message, error) {

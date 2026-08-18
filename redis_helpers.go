@@ -1,26 +1,43 @@
 package foundation
 
 import (
-	fredis "github.com/foundation-go/foundation/redis"
-	"github.com/getsentry/sentry-go"
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"github.com/redis/go-redis/v9"
+
+	fredis "github.com/foundation-go/foundation/redis"
 )
 
+// GetRedis returns the Redis client.
+//
+// It panics when the client is unavailable; see GetPostgreSQL for why, and use
+// TryGetRedis where the absence has to be handled.
 func (s *Service) GetRedis() *redis.Client {
+	client, err := s.TryGetRedis()
+	if err != nil {
+		panic(err)
+	}
+
+	return client
+}
+
+// TryGetRedis returns the Redis client, or an error explaining why it is not
+// available.
+func (s *Service) TryGetRedis() (*redis.Client, error) {
 	component := s.GetComponent(fredis.ComponentName)
 	if component == nil {
-		err := errors.New("redis component is not registered")
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		return nil, errors.New("no Redis component is registered: set REDIS_URL or use foundation.WithRedis()")
 	}
 
 	comp, ok := component.(*fredis.Component)
 	if !ok {
-		err := errors.New("redis component is not of type *foundation_redis.Component")
-		sentry.CaptureException(err)
-		s.Logger.Fatal(err)
+		return nil, fmt.Errorf("component `%s` is a %T, not a *redis.Component", fredis.ComponentName, component)
 	}
 
-	return comp.Connection
+	if comp.Connection == nil {
+		return nil, errors.New("the Redis component has not been started yet")
+	}
+
+	return comp.Connection, nil
 }

@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/getsentry/sentry-go"
 	gwruntime "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/foundation-go/foundation/gateway"
@@ -50,11 +50,22 @@ type GatewayOptions struct {
 	// This means MuxOpts can override Foundation defaults (e.g. add a later WithMarshalerOption).
 	MuxOpts []gwruntime.ServeMuxOption
 	// AuthenticationDetailsMiddleware is a middleware that populates the request context with authentication details.
+	//
+	// It is the only place in the chain that runs before authentication is
+	// enforced, so it is required whenever WithAuthentication is enabled.
 	AuthenticationDetailsMiddleware func(http.Handler) http.Handler
 	// WithAuthentication enables authentication for the gateway.
 	WithAuthentication bool
 	// AuthenticationExcept is a list of paths that should not be authenticated.
 	AuthenticationExcept []string
+	// TrustInboundAuthenticationHeaders disables stripping the identity-bearing
+	// Foundation headers (`X-Authenticated`, `X-User-Id`, `X-Client-Id`,
+	// `X-Scope`, `X-Metadata`) from incoming requests.
+	//
+	// Leave this off unless the gateway is only reachable through a trusted
+	// proxy that sets those headers itself. With it on, any client that can
+	// reach the gateway can impersonate any user.
+	TrustInboundAuthenticationHeaders bool
 	// Middleware is a list of middleware to apply to the gateway. The middleware is applied in the order it is defined.
 	Middleware []func(http.Handler) http.Handler
 	// StartComponentsOptions are the options to start the components.
@@ -83,6 +94,26 @@ func NewGatewayOptions() *GatewayOptions {
 	}
 }
 
+// Validate reports configuration mistakes that would leave the gateway in an
+// unsafe or non-functional state.
+func (o *GatewayOptions) Validate() error {
+	// With TrustInboundAuthenticationHeaders the identity headers come from the
+	// proxy in front of the gateway, so there is nothing for a details
+	// middleware to do — that deployment is exactly what the option exists for.
+	if o.WithAuthentication && o.AuthenticationDetailsMiddleware == nil && !o.TrustInboundAuthenticationHeaders {
+		return errors.New(
+			"WithAuthentication is enabled but AuthenticationDetailsMiddleware is not set: " +
+				"without it nothing populates the identity headers, and WithAuthentication " +
+				"would accept whatever the client sent. Set AuthenticationDetailsMiddleware " +
+				"(e.g. gateway.WithHydraAuthenticationDetails), or set " +
+				"TrustInboundAuthenticationHeaders if a trusted proxy in front of this " +
+				"gateway already sets them, or disable WithAuthentication",
+		)
+	}
+
+	return nil
+}
+
 // Start runs the Foundation gateway.
 func (s *Gateway) Start(opts *GatewayOptions) {
 	s.Options = opts
@@ -95,11 +126,12 @@ func (s *Gateway) Start(opts *GatewayOptions) {
 }
 
 func (s *Gateway) ServiceFunc(ctx context.Context) error {
+	if err := s.Options.Validate(); err != nil {
+		return fmt.Errorf("invalid gateway options: %w", err)
+	}
+
 	gwruntime.DefaultContextTimeout = s.Options.Timeout
 	s.Logger.Debugf("Downstream requests timeout: %s", s.Options.Timeout)
-
-	tracingShutdown := s.initTracing()
-	defer tracingShutdown()
 
 	marshaler := s.Options.Marshaler
 	if marshaler == nil {
@@ -112,10 +144,21 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 		gwruntime.WithIncomingHeaderMatcher(gateway.IncomingHeaderMatcher),
 		gwruntime.WithOutgoingHeaderMatcher(gateway.OutgoingHeaderMatcher),
 		gwruntime.WithMarshalerOption(gwruntime.MIMEWildcard, marshaler),
+		// Lets the metrics middleware label by matched route instead of by
+		// request path, which would be unbounded cardinality.
+		gwruntime.WithMetadata(gateway.RouteAnnotator),
 	}
 	muxOpts = append(muxOpts, s.Options.MuxOpts...)
 
+	// N.B.: context.WithoutCancel, deliberately. grpc-gateway's generated
+	// registration closes each downstream connection when this context is
+	// cancelled — and `ctx` is cancelled at the *start* of the shutdown, which
+	// would kill every in-flight proxied call with "grpc: the client
+	// connection is closing" while the HTTP server is still politely draining
+	// them. The deferred mux.Close below releases the connections after the
+	// drain, which is the right moment.
 	mux, err := gateway.RegisterServices(
+		context.WithoutCancel(ctx),
 		s.Options.Services,
 		&gateway.RegisterServicesOptions{
 			MuxOpts: muxOpts,
@@ -125,29 +168,39 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to register services: %w", err)
 	}
+	defer mux.Close() //nolint:errcheck // best effort on shutdown
 
-	port := GetEnvOrInt("PORT", 51051)
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: s.applyMiddleware(mux, s.Options),
-	}
+	port := GetEnvOrInt("PORT", DefaultPort)
+
+	// otelhttp wraps the whole chain so that the server span is the parent of
+	// everything the request does, including the client spans for downstream
+	// gRPC calls, which previously had no parent at all.
+	handler := otelhttp.NewHandler(
+		s.applyMiddleware(mux, s.Options),
+		"gateway",
+		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method }),
+	)
+
+	server := s.newHTTPServer(port, handler)
 
 	s.Logger.Infof("Listening on http://0.0.0.0:%d", port)
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			err = fmt.Errorf("failed to start server: %w", err)
-			sentry.CaptureException(err)
-			s.Logger.Fatal(err)
+			s.Fatal(err, "failed to start gateway HTTP server")
 		}
 	}()
 
 	<-ctx.Done()
 
-	// Gracefully stop the HTTP server
-	if err := server.Shutdown(context.Background()); err != nil {
-		err = fmt.Errorf("failed to gracefully shutdown HTTP server: %w", err)
-		return err
+	// Gracefully stop the HTTP server.
+	//
+	// A shutdown that runs out of budget is reported, not returned: returning
+	// it reaches Service.Fatal, which exits(1) and skips StopComponents — so a
+	// single slow request would cost the Kafka flush, the Sentry flush and a
+	// clean exit code on an otherwise ordinary rollout.
+	if err := s.shutdownHTTPServer(server); err != nil {
+		s.CaptureError(err, "failed to gracefully shutdown the gateway HTTP server")
 	}
 
 	return nil
@@ -156,8 +209,28 @@ func (s *Gateway) ServiceFunc(ctx context.Context) error {
 func (s *Service) applyMiddleware(mux http.Handler, opts *GatewayOptions) http.Handler {
 	var middleware []func(http.Handler) http.Handler
 
-	// General middleware
-	middleware = append(middleware, gateway.WithRequestLogger(s.Logger), gateway.WithCORSEnabled(opts.CORSOptions))
+	// Trust boundary: drop identity headers supplied by the client before
+	// anything downstream — including WithAuthentication — gets to read them.
+	// This has to stay first in the chain.
+	if !opts.TrustInboundAuthenticationHeaders {
+		middleware = append(middleware, gateway.StripClientAuthenticationHeaders)
+	} else {
+		s.Logger.Warn(
+			"TrustInboundAuthenticationHeaders is enabled: identity headers are taken from the " +
+				"client as-is. Only do this behind a trusted proxy.",
+		)
+	}
+
+	// General middleware.
+	//
+	// Recovery sits just inside the request logger, so a panic report carries
+	// the request's fields, and outside everything else.
+	middleware = append(middleware,
+		gateway.WithMetrics,
+		gateway.WithRequestLogger(s.Logger),
+		gateway.WithRecovery,
+		gateway.WithCORSEnabled(opts.CORSOptions),
+	)
 
 	// Swagger middleware
 	if len(opts.SwaggerEndpoints) > 0 {

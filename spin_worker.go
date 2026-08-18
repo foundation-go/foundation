@@ -2,14 +2,20 @@ package foundation
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 	"time"
 
 	ferr "github.com/foundation-go/foundation/errors"
+	fmetrics "github.com/foundation-go/foundation/metrics"
 )
 
-const (
-	SpinWorkerDefaultInterval = 5 * time.Millisecond
-)
+const SpinWorkerDefaultInterval = 5 * time.Millisecond
+
+// spinWorkerCancelGrace is how long the worker is given to unwind once the
+// drain timeout has already elapsed. It is a variable so that tests can shorten
+// it.
+var spinWorkerCancelGrace = 5 * time.Second
 
 // SpinWorker is a type of Foundation service.
 type SpinWorker struct {
@@ -64,28 +70,100 @@ func (sw *SpinWorker) Start(opts *SpinWorkerOptions) {
 
 // ServiceFunc is the default service function for a worker.
 func (sw *SpinWorker) ServiceFunc(ctx context.Context) error {
+	done := make(chan struct{})
+
 	go func() {
-	Loop:
-		for {
-			select {
-			case <-ctx.Done():
-				break Loop
-			default:
-				started := time.Now()
+		defer close(done)
 
-				if err := sw.Options.ProcessFunc(ctx); err != nil {
-					sw.HandleError(err, "failed to process iteration")
-				}
-
-				// Sleep for the remaining time of the interval
-				if sw.Options.Interval > 0 {
-					time.Sleep(sw.Options.Interval - time.Since(started))
-				}
-			}
-		}
+		sw.loop(ctx)
 	}()
 
 	<-ctx.Done()
 
+	// Service.Start tears the components down as soon as this returns, so the
+	// iteration in flight has to finish first. Without this wait the database
+	// pool and the Kafka reader are closed underneath a running ProcessFunc,
+	// which fails transactions that were about to commit.
+	sw.drain(done)
+
 	return nil
+}
+
+// drain waits for the worker loop to finish, within the shutdown budget.
+func (sw *SpinWorker) drain(done <-chan struct{}) {
+	timeout := sw.shutdownTimeout()
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	select {
+	case <-done:
+	case <-timer.C:
+		sw.Logger.Warnf(
+			"Worker iteration is still running after %s; stopping components anyway", timeout,
+		)
+
+		// Give the iteration a last moment to notice, then move on: blocking
+		// forever here would just get the process killed by the supervisor.
+		grace := time.NewTimer(spinWorkerCancelGrace)
+		defer grace.Stop()
+
+		select {
+		case <-done:
+		case <-grace.C:
+			sw.Logger.Error("Worker iteration did not stop; components will be stopped regardless")
+		}
+	}
+}
+
+// runIteration runs a single ProcessFunc call.
+//
+// A panic here used to kill the process: it happened on the worker goroutine,
+// where nothing recovers it and nothing reports it either.
+func (sw *SpinWorker) runIteration(ctx context.Context) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			fmetrics.Panics.WithLabelValues("worker").Inc()
+			sw.CaptureError(
+				fmt.Errorf("panic in worker iteration: %v\n%s", recovered, debug.Stack()),
+				"",
+			)
+		}
+	}()
+
+	if err := sw.Options.ProcessFunc(ctx); err != nil {
+		sw.HandleError(err, "failed to process iteration")
+	}
+}
+
+// loop runs ProcessFunc until the context is cancelled.
+func (sw *SpinWorker) loop(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		started := time.Now()
+
+		sw.runIteration(ctx)
+
+		if sw.Options.Interval <= 0 {
+			continue
+		}
+
+		remaining := sw.Options.Interval - time.Since(started)
+		if remaining <= 0 {
+			continue
+		}
+
+		// Sleep for the remaining time of the interval, but wake up immediately
+		// on shutdown instead of sitting through it.
+		timer := time.NewTimer(remaining)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
 }

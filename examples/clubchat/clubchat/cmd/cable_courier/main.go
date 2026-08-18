@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	f "github.com/foundation-go/foundation"
 	"google.golang.org/protobuf/proto"
+
+	f "github.com/foundation-go/foundation"
 
 	cpb "github.com/foundation-go/foundation/examples/clubchat/protos/chats"
 )

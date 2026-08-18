@@ -1,0 +1,87 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    # Correctness
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - errorlint
+    - nilerr
+    - rowserrcheck
+    - sqlclosecheck
+    - wastedassign
+
+    # Security. gosec is the reason three HTTP servers shipped without a
+    # ReadHeaderTimeout (G112) for as long as they did.
+    - gosec
+
+    # API hygiene
+    - noctx
+    - unconvert
+    - unparam
+    - copyloopvar
+
+  # Deliberately not enabled:
+  #
+  #   contextcheck — it reports every deliberately detached context as a bug.
+  #     Shutdown paths build a fresh context precisely because the request
+  #     context is already cancelled, and it also flags closures whose signature
+  #     is fixed by an external interface. One real finding, seven false
+  #     positives; the real one is fixed and the noise is not worth the
+  #     nolint comments it would take to silence.
+
+  settings:
+    errcheck:
+      # Deferred Close on a read-only handle, and writes to an
+      # http.ResponseWriter, have nothing useful to do with the error.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (net/http.ResponseWriter).Write
+
+    govet:
+      enable:
+        - shadow
+
+  exclusions:
+    generated: lax
+    rules:
+      # Generated protobuf and sqlc output is not ours to lint.
+      - path: '\.pb\.go$'
+        linters: [errcheck, govet, gosec, staticcheck, unused, unparam, revive]
+      - path: '\.pb\.gw\.go$'
+        linters: [errcheck, govet, gosec, staticcheck, unused, unparam, revive]
+      - path: 'outboxrepo/'
+        linters: [staticcheck, revive, unparam]
+
+      # Tests deliberately construct odd states, and their file handling and
+      # request building do not need the production rules.
+      - path: '_test\.go$'
+        linters: [gosec, noctx, unparam, errcheck]
+
+      # The CLI is a developer tool: it runs commands the developer typed and
+      # reads files the developer pointed it at. It has no cancellation story
+      # either, so noctx has nothing to offer here.
+      - path: 'internal/cli/'
+        linters: [gosec, noctx]
+
+      # The examples are documentation.
+      - path: 'examples/'
+        linters: [errcheck, gosec, noctx, unparam]
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/foundation-go/foundation

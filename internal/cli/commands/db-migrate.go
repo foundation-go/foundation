@@ -1,21 +1,11 @@
 package commands
 
 import (
-	"fmt"
 	"log"
-	"os"
 
-	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/spf13/cobra"
-
-	f "github.com/foundation-go/foundation"
-	h "github.com/foundation-go/foundation/internal/cli/helpers"
-)
-
-const (
-	MigrationsDirectory = "db/migrations"
 )
 
 var DBMigrate = &cobra.Command{
@@ -23,40 +13,18 @@ var DBMigrate = &cobra.Command{
 	Aliases: []string{"dbm"},
 	Short:   "Run database migrations",
 	Run: func(cmd *cobra.Command, _ []string) {
-		var dir string
-		databaseURL := f.GetEnvOrString("DATABASE_URL", "")
-
-		if f.IsProductionEnv() {
-			dir = cmd.Flag("dir").Value.String()
-			if dir == "" {
-				log.Fatal("You should specify the directory containing migrations with the `--dir` flag")
-			}
-		} else {
-			if !h.BuiltOnFoundation() {
-				log.Fatal("This command must be run from inside a Foundation service")
-			}
-
-			dir = h.AtServiceRoot(MigrationsDirectory)
-		}
-
-		// Check if migrations directory exists
-		_, err := os.Stat(dir)
-		if os.IsNotExist(err) {
-			log.Fatalf("Migrations directory `%s` does not exist", dir)
-		}
-
-		if databaseURL == "" {
-			log.Fatal("`DATABASE_URL` environment variable is not set")
-		}
-
-		m, err := migrate.New(fmt.Sprintf("file://%s", dir), databaseURL)
+		dir, err := migrationsDir(cmd.Flag("dir").Value.String())
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		if err = m.Up(); err != nil {
+		m, err := newMigrator(dir)
+		if err != nil {
 			log.Fatal(err)
 		}
+		defer closeMigrator(m)
+
+		reportMigrationResult(m.Up(), "Nothing to migrate")
 	},
 }
 

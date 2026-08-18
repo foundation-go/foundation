@@ -29,17 +29,16 @@ Foundation is built upon several proven technologies including:
   - **Spin Worker Mode**: This is your background worker, designed to continuously execute tasks. It offers configurability in terms of processing functions and the interval between task iterations.
   - **Jobs Worker Mode**: A mode to run background jobs with Gocraft Work. Support scheduled jobs, retrying, and concurrency.
   - **Events Worker Mode**: Building on the Worker Mode, this variant is tailored for Kafka. It ingests messages from Kafka topics and triggers associated Go function handlers.
-  - **Job Mode**: Best suited for one-off operations. Think of tasks like initializing your database, running migrations, or seeding initial data.
   - **Cable gRPC Mode**: Function as an AnyCable-compatible gRPC server, ideal for real-time WebSocket functionalities without sacrificing scalability.
   - **Cable Courier Mode**: This mode specializes in reading events from Kafka and then broadcasting them to Redis, readying the events for AnyCable processing. _Yeah, it would be much better if we could just use Kafka directly, but AnyCable doesn't support it._
   - **Outbox Courier Mode**: A mode to run a Kafka producer that reads messages from the database and publishes them to Kafka. _This is useful for implementing the transactional outbox pattern._
-- 📬 **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka.
+- 📬 **Transactional Outbox**: Implement the transactional outbox pattern for transactional message publishing to Kafka. Several courier replicas can run at once.
 - ✏️ **Unified Logging**: Conveniently log with colors during development and structured logging in production using `logrus`.
-- 🔍 **Tracing**: Trace and log your requests in a structured format with OpenTracing.
-- 📊 **Metrics**: Collect and expose service metrics to Prometheus.
-- 💓 **Health Check**: Provide Kubernetes with health status of your service.
-- 🔐 **(m)TLS**: TLS authentication for Kafka and mTLS for gRPC.
-- ⏳ **Graceful Shutdown**: Ensure clean shutdown on `SIGTERM` signal reception.
+- 🔍 **Tracing**: OpenTelemetry traces across every running mode, exported over OTLP, with parent-based sampling so a trace stays in one piece across services.
+- 📊 **Metrics**: Prometheus metrics for HTTP and gRPC requests, event processing and lag, outbox depth, background jobs, and component health.
+- 💓 **Health Check**: Separate liveness and readiness endpoints, with a draining phase on shutdown.
+- 🔐 **(m)TLS**: TLS authentication for Kafka and mTLS for gRPC and AnyCable.
+- ⏳ **Graceful Shutdown**: Clean shutdown on `SIGTERM`, bounded by `SHUTDOWN_TIMEOUT`, waiting for work in flight before closing anything.
 - 🛠️ **Helpers**: A variety of helpers for common tasks.
 - 🖥️ **CLI**: A CLI tool to help you get started and manage your project.
 
@@ -71,15 +70,49 @@ go install github.com/foundation-go/foundation/cmd/foundation@main
 There are several commands available:
 
 ```bash
-foundation completion # Generate shell completion scripts (prints to stdout)
-foundation db:migrate # Run database migrations
-foundation db:rollback # Rollback database migrations
-foundation start # Start the service (you will be prompted to choose a service to start)
-foundation test # Run tests
-foundation new # Create `--app` or `--service`
+foundation completion  # Generate shell completion scripts (prints to stdout)
+foundation db:migrate  # Run database migrations
+foundation db:rollback # Roll back database migrations
+foundation db:force    # Set the migration version, clearing the dirty flag
+foundation init-outbox # Copy the outbox migrations into this service
+foundation start       # Start the service (you will be prompted to choose one)
+foundation test        # Run tests
+foundation new         # Create `--app` or `--service`
 ```
 
 You can also run `foundation` without any arguments to see a list of available commands, or run `foundation <command> --help` to see the available options for a specific command.
+
+## 🧪 Tests
+
+```bash
+make test              # unit suite, race detector on, no Docker needed
+make test-integration  # against real Postgres, Redis and Kafka in containers
+make lint
+```
+
+The [integration tests](./test/integration) verify what the unit tests can only
+assume: that `FOR UPDATE SKIP LOCKED` really keeps two outbox couriers from
+publishing the same event, that a consumer group's committed offset really
+advances past unhandled messages, that a Redis URL's database number is really
+honoured. They live in their own Go module so that testcontainers stays out of
+the framework's dependency graph.
+
+## ⬆️ Upgrading
+
+Breaking changes and behaviour changes between releases are listed in
+[MIGRATION.md](./MIGRATION.md).
+
+## 🔒 Trust boundary
+
+The gateway authenticates a request and forwards the caller's identity to
+downstream services as `X-Authenticated`, `X-User-Id`, `X-Client-Id`, `X-Scope`
+and `X-Metadata`. It strips those headers — and their `Grpc-Metadata-` aliases —
+from every incoming request, so a client cannot supply its own.
+
+Downstream gRPC services trust that metadata unconditionally: `fctx.GetUserID`
+returns whatever arrived. Anything that can reach a service's gRPC port can
+therefore claim any identity. Restrict the port at the network level, enable
+mTLS with `GRPC_TLS_DIR`, or both.
 
 ## 🤝 Contributing
 

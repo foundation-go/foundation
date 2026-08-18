@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
 func AtServiceRoot(paths ...string) string {
@@ -147,6 +149,22 @@ func BuiltOnFoundation() bool {
 	return true
 }
 
+// CopyFile copies src to dst, preserving nothing but the contents.
+//
+// Used instead of shelling out to `cp`, which does not exist on Windows.
+func CopyFile(src, dst string) error {
+	content, err := os.ReadFile(src) // #nosec G304 -- paths come from the CLI's own scaffolding
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", src, err)
+	}
+
+	if err := os.WriteFile(dst, content, 0o600); err != nil {
+		return fmt.Errorf("failed to write %s: %w", dst, err)
+	}
+
+	return nil
+}
+
 func RunCommand(dir string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
@@ -158,9 +176,15 @@ func RunCommand(dir string, name string, args ...string) error {
 
 func InGitRepository() bool {
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
-	output, err := cmd.Output()
 
-	return err == nil && string(output) == "true\n"
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+
+	// Trimming rather than comparing to "true\n": the line ending is "\r\n" on
+	// Windows, where this always reported false.
+	return strings.TrimSpace(string(output)) == "true"
 }
 
 // FoundationConfig represents the structure of foundation.toml
@@ -174,46 +198,20 @@ type FoundationConfig struct {
 	} `toml:"app"`
 }
 
-// ParseFoundationToml parses a foundation.toml file and returns the configuration
+// ParseFoundationToml parses a foundation.toml file and returns the configuration.
+//
+// It used to be a hand-rolled line scanner that tracked whether it was inside
+// `[app]` and split on the first `=`: it mishandled comments, quoted keys,
+// inline tables and multi-line values, and silently returned an empty config
+// rather than reporting that it had not understood the file.
 func ParseFoundationToml(path string) (*FoundationConfig, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
 	config := &FoundationConfig{}
-	scanner := bufio.NewScanner(file)
-	
-	inAppSection := false
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		
-		if line == "[app]" {
-			inAppSection = true
-			continue
-		} else if strings.HasPrefix(line, "[") {
-			inAppSection = false
-			continue
-		}
-		
-		if inAppSection && strings.Contains(line, "=") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				key := strings.TrimSpace(parts[0])
-				value := strings.Trim(strings.TrimSpace(parts[1]), `"`)
-				
-				switch key {
-				case "name":
-					config.App.Name = value
-				case "module":
-					config.App.Module = value
-				}
-			}
-		}
+
+	if _, err := toml.DecodeFile(path, config); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
 	}
 
-	return config, scanner.Err()
+	return config, nil
 }
 
 // GetAppConfig reads the foundation.toml from the application root
@@ -251,7 +249,7 @@ func ConstructServiceModuleName(serviceName string) (string, error) {
 // inferServiceModuleFromWorkspace tries to infer the full service module path from existing workspace
 func inferServiceModuleFromWorkspace(appName, serviceName string) (string, error) {
 	appRoot := GetApplicationRoot()
-	
+
 	// Check for go.work first
 	goWorkPath := filepath.Join(appRoot, "go.work")
 	if _, err := os.Stat(goWorkPath); err == nil {
@@ -279,7 +277,7 @@ func inferModuleFromGoWork(goWorkPath string) (string, error) {
 			servicePath := strings.Trim(line, `"./ `)
 			appRoot := filepath.Dir(goWorkPath)
 			goModPath := filepath.Join(appRoot, servicePath, "go.mod")
-			
+
 			if _, err := os.Stat(goModPath); err == nil {
 				if module, err := readModuleFromGoMod(goModPath); err == nil {
 					// Extract base module by removing the service name

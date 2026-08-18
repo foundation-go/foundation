@@ -1,7 +1,9 @@
 package jobs
 
 import (
-	"fmt"
+	"context"
+	"errors"
+	"time"
 
 	"github.com/gocraft/work"
 	"github.com/gomodule/redigo/redis"
@@ -15,6 +17,9 @@ const (
 const (
 	DefaultPoolSize  = 5
 	DefaultNamespace = "__foundation_jobs__"
+
+	// DefaultHealthTimeout bounds a health check made without a context.
+	DefaultHealthTimeout = 2 * time.Second
 )
 
 type Component struct {
@@ -59,38 +64,69 @@ func NewComponent(opts ...ComponentOption) *Component {
 	return c
 }
 
+// log returns the component logger, or a usable default when the component was
+// built without one.
+func (c *Component) log() *logrus.Entry {
+	if c.logger == nil {
+		return logrus.NewEntry(logrus.StandardLogger()).WithField("component", c.Name())
+	}
+
+	return c.logger
+}
+
 // Start implements the Component interface.
 func (c *Component) Start() error {
 	if c.namespace == "" {
 		c.namespace = DefaultNamespace
 	}
 
+	if c.redisPool == nil {
+		return errors.New("jobs enqueuer requires a redis pool")
+	}
+
 	c.Enqueuer = work.NewEnqueuer(c.namespace, c.redisPool)
+
 	return c.Health()
 }
 
 // Stop implements the Component interface.
 func (c *Component) Stop() error {
-	c.logger.Info("Disconnecting jobs enqueuer from redis...")
+	if c.Enqueuer == nil || c.Enqueuer.Pool == nil {
+		return nil
+	}
+
+	c.log().Info("Disconnecting jobs enqueuer from redis...")
 
 	return c.Enqueuer.Pool.Close()
 }
 
 // Health implements the Component interface.
 func (c *Component) Health() error {
-	if c.Enqueuer.Pool == nil {
-		return fmt.Errorf("jobs enqueuer redis connection is not initialized")
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultHealthTimeout)
+	defer cancel()
+
+	return c.HealthContext(ctx)
+}
+
+// HealthContext implements the HealthCheckerContext interface.
+func (c *Component) HealthContext(ctx context.Context) error {
+	// N.B.: the nil check used to be on c.Enqueuer.Pool, which dereferences a
+	// nil c.Enqueuer before Start has run. The metrics server — and therefore
+	// the probe endpoint — is registered before this component, so that window
+	// is reachable in practice.
+	if c.Enqueuer == nil || c.Enqueuer.Pool == nil {
+		return errors.New("jobs enqueuer redis connection is not initialized")
 	}
 
-	conn := c.Enqueuer.Pool.Get()
-	defer conn.Close()
-
-	_, err := conn.Do("PING")
+	conn, err := c.Enqueuer.Pool.GetContext(ctx)
 	if err != nil {
 		return err
 	}
+	defer conn.Close() //nolint:errcheck // returning the connection to the pool
 
-	return nil
+	_, err = redis.DoContext(conn, ctx, "PING")
+
+	return err
 }
 
 // Name implements the Component interface.

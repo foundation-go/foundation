@@ -1,0 +1,23 @@
+version: "2"
+
+# These are integration tests, not library code: they set up containers, build
+# throwaway URLs and deliberately provoke failures. The correctness linters
+# still apply; the production hygiene rules have nothing to say here.
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - errorlint
+    - copyloopvar
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/foundation-go/foundation
